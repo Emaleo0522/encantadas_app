@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
+import 'validate_product_code.dart';
 
 class ProductCodeGenerator {
   static const String _codePrefix = 'P-';
@@ -10,25 +11,32 @@ class ProductCodeGenerator {
   /// Generates a unique product code
   /// Format: P-001, P-002, etc. (incremental)
   /// If incremental fails, falls back to random alphanumeric
+  /// Uses ProductCodeValidator for enhanced validation
   static String generateUniqueCode() {
-    final box = Hive.box<Product>('products');
+    try {
+      // Use the enhanced generator from validator
+      return ProductCodeValidator.generateUniqueCode(prefix: _codePrefix);
+    } catch (e) {
+      // Fallback to original logic if validator fails
+      // Warning: Using fallback code generation due to error
+      return _generateFallbackCode();
+    }
+  }
+  
+  /// Fallback code generation method
+  static String _generateFallbackCode() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final randomSuffix = (timestamp % 10000).toString().padLeft(4, '0');
+    final code = '$_codePrefix$randomSuffix';
     
-    // Try incremental approach first
-    String code = _generateIncrementalCode(box);
-    
-    // If incremental code already exists, try random approach
-    int attempts = 0;
-    while (_codeExists(box, code) && attempts < 100) {
-      code = _generateRandomCode();
-      attempts++;
+    // Final validation
+    if (ProductCodeValidator.isCodeValid(code) && ProductCodeValidator.isCodeUnique(code)) {
+      return code;
     }
     
-    // If still not unique after 100 attempts, use timestamp-based
-    if (_codeExists(box, code)) {
-      code = _generateTimestampCode();
-    }
-    
-    return code;
+    // Ultimate fallback: UUID-style
+    final uuid = DateTime.now().microsecondsSinceEpoch.toRadixString(36).toUpperCase();
+    return '$_codePrefix${uuid.substring(uuid.length - 6)}';
   }
 
   /// Generates incremental code based on existing products
@@ -77,12 +85,21 @@ class ProductCodeGenerator {
   }
 
   /// Checks if a code already exists in the database
+  /// DEPRECATED: Use ProductCodeValidator.isCodeUnique instead
+  @deprecated
   static bool _codeExists(Box<Product> box, String code) {
-    return box.values.any((product) => product.code.toLowerCase() == code.toLowerCase());
+    return !ProductCodeValidator.isCodeUnique(code);
   }
 
   /// Validates if a code follows the expected format
+  /// Uses enhanced validation from ProductCodeValidator
   static bool isValidCode(String code) {
+    // Use the enhanced validator first
+    if (!ProductCodeValidator.isCodeValid(code)) {
+      return false;
+    }
+    
+    // Additional legacy format checks for backwards compatibility
     if (code.isEmpty) return false;
     
     // Must start with prefix
@@ -90,16 +107,12 @@ class ProductCodeGenerator {
       return false;
     }
     
-    // Must have correct length
-    if (code.length != _codeLength) {
+    // Must have reasonable length (flexible for future expansion)
+    if (code.length < 4 || code.length > 20) {
       return false;
     }
     
-    // Suffix must be alphanumeric
-    final suffix = code.substring(_codePrefix.length);
-    final alphanumericRegex = RegExp(r'^[A-Z0-9]+$');
-    
-    return alphanumericRegex.hasMatch(suffix.toUpperCase());
+    return true;
   }
 
   /// Gets the next available incremental code (for display purposes)

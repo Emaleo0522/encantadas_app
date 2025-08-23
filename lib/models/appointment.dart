@@ -46,4 +46,26 @@ class Appointment extends HiveObject {
   String get formattedPrice {
     return '\$${price.toStringAsFixed(0)}';
   }
+
+  /// Convert appointment to JSON for backup
+  Map<String, dynamic> toJson() {
+    return {
+      'clientName': clientName,
+      'dateTime': dateTime.toIso8601String(),
+      'serviceName': serviceName,
+      'price': price,
+      'completed': completed,
+    };
+  }
+
+  /// Create appointment from JSON for restore
+  static Appointment fromJson(Map<String, dynamic> json) {
+    return Appointment(
+      clientName: json['clientName'] as String,
+      dateTime: DateTime.parse(json['dateTime'] as String),
+      serviceName: json['serviceName'] as String,
+      price: (json['price'] as num).toDouble(),
+      completed: json['completed'] as bool? ?? false,
+    );
+  }
 }

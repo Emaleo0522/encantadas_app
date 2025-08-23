@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/balance_summary_card.dart';
+import '../widgets/pie_chart_card.dart';
+import '../widgets/sales_type_summary_card.dart';
 
 class BalanceScreen extends StatelessWidget {
   const BalanceScreen({super.key});
@@ -8,24 +11,31 @@ class BalanceScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Balance'),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? Colors.grey.shade900 
+            : Colors.green.shade50,
+        elevation: 0,
       ),
-      body: const Center(
+      backgroundColor: Theme.of(context).brightness == Brightness.dark 
+          ? Colors.grey.shade900 
+          : Colors.grey.shade50,
+      body: const SingleChildScrollView(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.account_balance,
-              size: 80,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Pantalla de Balance en construcción',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            // Tarjeta de resumen de ganancias
+            BalanceSummaryCard(),
+            
+            // Resumen de ventas por tipo (productos y servicios)
+            SalesTypeSummaryCard(),
+            
+            // Gráfico de torta con desglose turnos vs ventas
+            PieChartCard(),
+            
+            // Espaciador para contenido futuro
+            SizedBox(height: 20),
+            
+            // Aquí puedes agregar más widgets en el futuro
+            // Por ejemplo: historial detallado, filtros por fecha, etc.
           ],
         ),
       ),

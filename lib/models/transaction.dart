@@ -89,4 +89,32 @@ class Transaction extends HiveObject {
     if (!isProductSale) return serviceName;
     return '${productName} (${formattedQuantity})';
   }
+
+  /// Convert transaction to JSON for backup
+  Map<String, dynamic> toJson() {
+    return {
+      'amount': amount,
+      'date': date.toIso8601String(),
+      'source': source,
+      'clientName': clientName,
+      'serviceName': serviceName,
+      'productName': productName,
+      'quantity': quantity,
+      'unitPrice': unitPrice,
+    };
+  }
+
+  /// Create transaction from JSON for restore
+  static Transaction fromJson(Map<String, dynamic> json) {
+    return Transaction(
+      amount: (json['amount'] as num).toDouble(),
+      date: DateTime.parse(json['date'] as String),
+      source: json['source'] as String,
+      clientName: json['clientName'] as String,
+      serviceName: json['serviceName'] as String,
+      productName: json['productName'] as String?,
+      quantity: json['quantity'] as int?,
+      unitPrice: json['unitPrice'] != null ? (json['unitPrice'] as num).toDouble() : null,
+    );
+  }
 }

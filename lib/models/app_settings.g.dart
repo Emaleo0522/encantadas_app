@@ -1,41 +1,41 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'provider.dart';
+part of 'app_settings.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class ProviderAdapter extends TypeAdapter<Provider> {
+class AppSettingsAdapter extends TypeAdapter<AppSettings> {
   @override
-  final int typeId = 4;
+  final int typeId = 6;
 
   @override
-  Provider read(BinaryReader reader) {
+  AppSettings read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return Provider(
-      name: fields[0] as String,
-      contact: fields[1] as String?,
-      rubro: fields[2] as String,
-      createdAt: fields[3] as DateTime,
+    return AppSettings(
+      autoQRMode: fields[0] as bool,
+      showConfirmationDialogs: fields[1] as bool,
+      enableNotifications: fields[2] as bool,
+      defaultSaleType: fields[3] as String,
     );
   }
 
   @override
-  void write(BinaryWriter writer, Provider obj) {
+  void write(BinaryWriter writer, AppSettings obj) {
     writer
       ..writeByte(4)
       ..writeByte(0)
-      ..write(obj.name)
+      ..write(obj.autoQRMode)
       ..writeByte(1)
-      ..write(obj.contact)
+      ..write(obj.showConfirmationDialogs)
       ..writeByte(2)
-      ..write(obj.rubro)
+      ..write(obj.enableNotifications)
       ..writeByte(3)
-      ..write(obj.createdAt);
+      ..write(obj.defaultSaleType);
   }
 
   @override
@@ -44,7 +44,7 @@ class ProviderAdapter extends TypeAdapter<Provider> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ProviderAdapter &&
+      other is AppSettingsAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

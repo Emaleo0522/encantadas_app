@@ -1,13 +1,21 @@
 {
-    "name": "encantadas_app",
-    "short_name": "encantadas_app",
+    "name": "Encantadas - Gestión de Belleza",
+    "short_name": "Encantadas",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#E91E63",
+    "theme_color": "#E91E63",
+    "description": "App de gestión integral para negocios de belleza y estética",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
+    "categories": ["business", "productivity"],
+    "scope": "/",
+    "protocol_handlers": [
+        {
+            "protocol": "web+encantadas",
+            "url": "/?qr=%s"
+        }
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",

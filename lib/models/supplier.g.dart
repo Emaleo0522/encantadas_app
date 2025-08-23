@@ -1,40 +1,43 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'provider.dart';
+part of 'supplier.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class ProviderAdapter extends TypeAdapter<Provider> {
+class SupplierAdapter extends TypeAdapter<Supplier> {
   @override
-  final int typeId = 4;
+  final int typeId = 5;
 
   @override
-  Provider read(BinaryReader reader) {
+  Supplier read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return Provider(
+    return Supplier(
       name: fields[0] as String,
-      contact: fields[1] as String?,
-      rubro: fields[2] as String,
-      createdAt: fields[3] as DateTime,
+      contactNumber: fields[1] as String?,
+      category: fields[2] as String,
+      notes: fields[3] as String?,
+      createdAt: fields[4] as DateTime?,
     );
   }
 
   @override
-  void write(BinaryWriter writer, Provider obj) {
+  void write(BinaryWriter writer, Supplier obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
-      ..write(obj.contact)
+      ..write(obj.contactNumber)
       ..writeByte(2)
-      ..write(obj.rubro)
+      ..write(obj.category)
       ..writeByte(3)
+      ..write(obj.notes)
+      ..writeByte(4)
       ..write(obj.createdAt);
   }
 
@@ -44,7 +47,7 @@ class ProviderAdapter extends TypeAdapter<Provider> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ProviderAdapter &&
+      other is SupplierAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

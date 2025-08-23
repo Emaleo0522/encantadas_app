@@ -13,6 +13,7 @@ class _AddProviderFormState extends State<AddProviderForm> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
+  String? _selectedRubro;
   bool _isLoading = false;
 
   @override
@@ -36,6 +37,8 @@ class _AddProviderFormState extends State<AddProviderForm> {
           contact: _contactController.text.trim().isEmpty 
               ? null 
               : _contactController.text.trim(),
+          rubro: _selectedRubro!,
+          createdAt: DateTime.now(),
         );
 
         await providersBox.add(provider);
@@ -78,10 +81,12 @@ class _AddProviderFormState extends State<AddProviderForm> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Padding(
         padding: EdgeInsets.only(
@@ -135,6 +140,65 @@ class _AddProviderFormState extends State<AddProviderForm> {
                     return null;
                   },
                   onFieldSubmitted: (_) => _saveProvider(),
+                ),
+                const SizedBox(height: 16),
+
+                // Rubro dropdown
+                DropdownButtonFormField<String>(
+                  value: _selectedRubro,
+                  decoration: const InputDecoration(
+                    labelText: 'Rubro',
+                    hintText: 'Seleccione el rubro del proveedor',
+                    prefixIcon: Icon(Icons.category),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: Provider.availableRubros.map((String rubro) {
+                    String emoji;
+                    switch (rubro) {
+                      case 'Ropa':
+                        emoji = '👗';
+                        break;
+                      case 'Bijouterie':
+                        emoji = '💎';
+                        break;
+                      case 'Pedicura':
+                      case 'Manicura':
+                        emoji = '💅';
+                        break;
+                      case 'Belleza':
+                        emoji = '✨';
+                        break;
+                      case 'Accesorios':
+                        emoji = '👜';
+                        break;
+                      case 'Calzado':
+                        emoji = '👠';
+                        break;
+                      case 'Cosméticos':
+                        emoji = '💄';
+                        break;
+                      case 'Herramientas':
+                        emoji = '🔧';
+                        break;
+                      default:
+                        emoji = '📦';
+                    }
+                    return DropdownMenuItem<String>(
+                      value: rubro,
+                      child: Text('$emoji $rubro'),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedRubro = newValue;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Por favor seleccione un rubro';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 

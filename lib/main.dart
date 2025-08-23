@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:html' as html;
 
 import 'theme/theme.dart';
 import 'models/appointment.dart';
 import 'models/transaction.dart';
 import 'models/product.dart';
 import 'models/provider.dart';
+import 'models/supplier.dart';
+import 'models/app_settings.dart';
+import 'models/cliente.dart';
+import 'models/cuenta_corriente.dart';
+import 'models/movimiento_cuenta.dart';
 import 'widgets/add_appointment_form.dart';
 import 'widgets/add_product_form.dart';
 import 'widgets/add_provider_form.dart';
@@ -18,6 +24,9 @@ import 'screens/stock_screen.dart';
 import 'screens/ventas_screen.dart';
 import 'screens/balance_screen.dart';
 import 'screens/providers_screen.dart';
+import 'screens/cuenta_corriente_screen.dart';
+import 'widgets/qr_processing_dialog.dart';
+import 'services/backup_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -33,14 +42,28 @@ void main() async {
   Hive.registerAdapter(ProductCategoryAdapter());
   Hive.registerAdapter(ProductAdapter());
   Hive.registerAdapter(ProviderAdapter());
+  Hive.registerAdapter(SupplierAdapter());
+  Hive.registerAdapter(AppSettingsAdapter());
+  Hive.registerAdapter(ClienteAdapter());
+  Hive.registerAdapter(CuentaCorrienteAdapter());
+  Hive.registerAdapter(TipoMovimientoAdapter());
+  Hive.registerAdapter(MovimientoCuentaAdapter());
   
   // Open Hive boxes
   await Hive.openBox<Appointment>('appointments');
   await Hive.openBox<Transaction>('transactions');
   await Hive.openBox<Product>('products');
   await Hive.openBox<Provider>('providers');
+  await Hive.openBox<Supplier>('suppliers');
+  await Hive.openBox<AppSettings>('settings');
+  await Hive.openBox<Cliente>('clientes_cuenta');
+  await Hive.openBox<CuentaCorriente>('cuentas_corrientes');
+  await Hive.openBox<MovimientoCuenta>('movimientos_cuenta');
   
   await initializeNotifications();
+  
+  // Initialize backup service
+  await BackupService.instance.initialize();
   
   runApp(const EncantadasApp());
 }
@@ -85,6 +108,31 @@ class EncantadasApp extends StatefulWidget {
 
 class _EncantadasAppState extends State<EncantadasApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  String? _initialQRCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUrlParameters();
+  }
+
+  void _checkUrlParameters() {
+    try {
+      final uri = Uri.parse(html.window.location.href);
+      final qrCode = uri.queryParameters['qr'];
+      if (qrCode != null && qrCode.isNotEmpty) {
+        _initialQRCode = qrCode;
+        // Clear the URL parameter for clean navigation
+        html.window.history.replaceState(
+          null, 
+          'Encantadas', 
+          uri.origin + uri.path
+        );
+      }
+    } catch (e) {
+      // Handle any parsing errors silently
+    }
+  }
 
   void toggleTheme() {
     setState(() {
@@ -111,25 +159,61 @@ class _EncantadasAppState extends State<EncantadasApp> {
         Locale('es', 'ES'),
       ],
       locale: const Locale('es', 'ES'),
-      home: MainNavigationScreen(onThemeToggle: toggleTheme),
+      home: MainNavigationScreen(
+        onThemeToggle: toggleTheme,
+        initialQRCode: _initialQRCode,
+      ),
     );
   }
 }
 
 class MainNavigationScreen extends StatefulWidget {
   final VoidCallback onThemeToggle;
+  final String? initialQRCode;
   
   const MainNavigationScreen({
     super.key,
     required this.onThemeToggle,
+    this.initialQRCode,
   });
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  State<MainNavigationScreen> createState() => MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // If there's an initial QR code, navigate to sales and process it
+    if (widget.initialQRCode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleExternalQRCode(widget.initialQRCode!);
+      });
+    }
+  }
+
+  void _handleExternalQRCode(String qrCode) {
+    // Navigate to sales tab
+    setState(() {
+      _selectedIndex = 3; // VentasScreen index
+    });
+
+    // Show QR processing dialog after a short delay
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _processExternalQRCode(qrCode);
+    });
+  }
+
+  void _processExternalQRCode(String qrCode) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => QRProcessingDialog(qrCode: qrCode),
+    );
+  }
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -137,12 +221,55 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const StockScreen(),
     const VentasScreen(),
     const BalanceScreen(),
+    const ProvidersScreen(),
+    const CuentaCorrienteScreen(),
   ];
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _selectedIndex == index;
+    return Flexible(
+      child: InkWell(
+        onTap: () => _onItemTapped(index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected 
+                    ? Theme.of(context).primaryColor 
+                    : Colors.grey,
+                size: 18,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected 
+                      ? Theme.of(context).primaryColor 
+                      : Colors.grey,
+                  fontSize: 8,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Método público para navegación desde HomeScreen
+  void navigateToTab(int index) {
+    _onItemTapped(index);
   }
 
   // Get the FAB for the current screen
@@ -187,6 +314,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           tooltip: 'Registrar nueva venta',
           child: const Icon(Icons.add),
         );
+      case 5: // ProvidersScreen
+        return FloatingActionButton(
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => const AddProviderForm(),
+            );
+          },
+          tooltip: 'Agregar nuevo proveedor',
+          child: const Icon(Icons.add),
+        );
+      case 6: // CuentaCorrienteScreen
+        return null; // La pantalla maneja su propio FAB
       default:
         return FloatingActionButton(
           onPressed: widget.onThemeToggle,
@@ -204,32 +346,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Inicio',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.schedule),
-            label: 'Turnos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory),
-            label: 'Stock',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Ventas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance),
-            label: 'Balance',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavItem(0, Icons.home, 'Inicio'),
+            _buildNavItem(1, Icons.schedule, 'Turnos'),
+            _buildNavItem(2, Icons.inventory, 'Stock'),
+            _buildNavItem(3, Icons.shopping_cart, 'Ventas'),
+            _buildNavItem(4, Icons.account_balance, 'Balance'),
+            _buildNavItem(5, Icons.people, 'Proveed.'),
+            _buildNavItem(6, Icons.account_balance_wallet, 'Fiado'),
+          ],
+        ),
       ),
       floatingActionButton: _getCurrentFAB(),
     );

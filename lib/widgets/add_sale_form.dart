@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/transaction.dart';
+import '../models/app_settings.dart';
+import 'qr_scanner_overlay.dart';
 
 class AddSaleForm extends StatefulWidget {
   const AddSaleForm({super.key});
@@ -68,13 +70,267 @@ class _AddSaleFormState extends State<AddSaleForm> {
     setState(() {
       _selectedProduct = product;
       _searchController.text = product.name;
-      // Set default unit price from product cost if available
-      if (product.cost != null && product.cost! > 0) {
+      
+      // Set default unit price - prioritize sale price over cost
+      if (product.hasSalePriceInfo) {
+        // Use configured sale price (either fixed price or calculated from percentage)
+        _unitPriceController.text = product.calculatedSalePrice.toStringAsFixed(0);
+      } else if (product.cost != null && product.cost! > 0) {
+        // Fallback to cost if no sale price is configured
         _unitPriceController.text = product.cost!.toStringAsFixed(0);
       }
+      
       _filteredProducts.clear();
     });
     _calculateTotal();
+  }
+
+  Future<void> _openQRScanner() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => QRScannerOverlay(
+        onCodeScanned: (code) {
+          Navigator.of(context).pop();
+          _onQRCodeScanned(code);
+        },
+        onCancel: () {
+          Navigator.of(context).pop();
+        },
+      ),
+    );
+  }
+
+  void _onQRCodeScanned(String scannedCode) {
+    // Buscar producto por código QR
+    final productsBox = Hive.box<Product>('products');
+    final allProducts = productsBox.values.toList().cast<Product>();
+    
+    // Buscar producto que coincida con el código escaneado
+    Product? foundProduct;
+    
+    // Primero buscar por código exacto
+    for (final product in allProducts) {
+      if (product.code == scannedCode) {
+        foundProduct = product;
+        break;
+      }
+    }
+    
+    // Si no se encuentra por código, buscar por nombre que contenga el código
+    if (foundProduct == null) {
+      for (final product in allProducts) {
+        if (product.name.toLowerCase().contains(scannedCode.toLowerCase())) {
+          foundProduct = product;
+          break;
+        }
+      }
+    }
+    
+    if (foundProduct != null) {
+      // Verificar que tenga stock
+      if (foundProduct.quantity > 0) {
+        _selectProduct(foundProduct);
+        
+        // Verificar si el modo automático está activado
+        final settings = AppSettings.instance;
+        if (settings.autoQRMode) {
+          // Procesar venta automáticamente
+          _processAutomaticSale(foundProduct);
+        } else {
+          // Mostrar mensaje de éxito (modo manual)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Producto encontrado: ${foundProduct.name}'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Producto sin stock
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Producto "${foundProduct.name}" sin stock disponible'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      // Producto no encontrado
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('No se encontró un producto con el código: $scannedCode'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _processAutomaticSale(Product product) async {
+    // Configurar valores por defecto para venta automática
+    final quantity = 1; // Cantidad por defecto
+    final unitPrice = product.hasSalePriceInfo 
+        ? product.calculatedSalePrice 
+        : (product.cost ?? 0.0);
+    
+    // Verificar stock suficiente
+    if (quantity > product.quantity) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Stock insuficiente para venta automática'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Actualizar stock del producto
+      product.quantity -= quantity;
+      await product.save();
+
+      // Crear transacción
+      final transactionsBox = Hive.box<Transaction>('transactions');
+      final total = quantity * unitPrice;
+      final transaction = Transaction(
+        amount: total,
+        date: DateTime.now(),
+        source: 'venta',
+        clientName: '', 
+        serviceName: '',
+        productName: product.name,
+        quantity: quantity,
+        unitPrice: unitPrice,
+      );
+
+      await transactionsBox.add(transaction);
+
+      if (mounted) {
+        // Cerrar el formulario y mostrar confirmación
+        Navigator.of(context).pop();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.flash_auto, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Venta automática procesada: ${product.name} - \$${total.toStringAsFixed(0)}',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.blue,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Ver detalles',
+              textColor: Colors.white,
+              onPressed: () {
+                // Mostrar detalles de la venta
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Row(
+                      children: [
+                        const Icon(Icons.receipt, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        const Text('Venta Automática'),
+                      ],
+                    ),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Producto: ${product.name}'),
+                        Text('Cantidad: $quantity unidad${quantity > 1 ? 'es' : ''}'),
+                        Text('Precio unitario: \$${unitPrice.toStringAsFixed(0)}'),
+                        const Divider(),
+                        Text(
+                          'Total: \$${total.toStringAsFixed(0)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cerrar'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Error en venta automática: $e'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _calculateTotal() {
@@ -231,8 +487,18 @@ class _AddSaleFormState extends State<AddSaleForm> {
                         ? IconButton(
                             icon: const Icon(Icons.clear),
                             onPressed: _clearSelection,
+                            tooltip: 'Limpiar selección',
                           )
-                        : null,
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.qr_code_scanner),
+                                onPressed: _openQRScanner,
+                                tooltip: 'Escanear QR',
+                              ),
+                            ],
+                          ),
                     border: const OutlineInputBorder(),
                   ),
                   readOnly: _selectedProduct != null,
@@ -285,9 +551,9 @@ class _AddSaleFormState extends State<AddSaleForm> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
+                      color: Colors.green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,9 +650,9 @@ class _AddSaleFormState extends State<AddSaleForm> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
+                      color: Colors.blue.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
                     ),
                     child: Column(
                       children: [

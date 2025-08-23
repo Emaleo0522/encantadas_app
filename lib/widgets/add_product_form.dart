@@ -17,11 +17,14 @@ class _AddProductFormState extends State<AddProductForm> {
   final _nameController = TextEditingController();
   final _quantityController = TextEditingController();
   final _costController = TextEditingController();
+  final _salePriceController = TextEditingController();
+  final _profitPercentageController = TextEditingController();
   
   ProductCategory _selectedCategory = ProductCategory.ropa;
   Provider? _selectedProvider;
   bool _isLoading = false;
   String _previewCode = '';
+  bool _usePercentage = false;
 
   @override
   void initState() {
@@ -34,6 +37,8 @@ class _AddProductFormState extends State<AddProductForm> {
     _nameController.dispose();
     _quantityController.dispose();
     _costController.dispose();
+    _salePriceController.dispose();
+    _profitPercentageController.dispose();
     super.dispose();
   }
 
@@ -52,6 +57,73 @@ class _AddProductFormState extends State<AddProductForm> {
       case ProductCategory.bijouterie:
         return const Color(0xFFFF9800); // Orange
     }
+  }
+
+  Widget _buildPricePreview() {
+    final cost = double.tryParse(_costController.text.trim()) ?? 0.0;
+    if (cost <= 0) return const SizedBox.shrink();
+
+    double salePrice = 0.0;
+    double profit = 0.0;
+    double profitPercentage = 0.0;
+
+    if (_usePercentage) {
+      final percentage = double.tryParse(_profitPercentageController.text.trim()) ?? 0.0;
+      salePrice = cost + (cost * percentage / 100);
+      profit = salePrice - cost;
+      profitPercentage = percentage;
+    } else {
+      salePrice = double.tryParse(_salePriceController.text.trim()) ?? 0.0;
+      profit = salePrice - cost;
+      profitPercentage = cost > 0 ? (profit / cost) * 100 : 0.0;
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Icon(Icons.preview, color: Colors.blue, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              'Vista Previa',
+              style: TextStyle(
+                color: Colors.blue[700],
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Costo:', style: TextStyle(color: Colors.grey[600])),
+            Text('\$${cost.toStringAsFixed(0)}', 
+                 style: const TextStyle(fontWeight: FontWeight.w500)),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Precio de venta:', style: TextStyle(color: Colors.grey[600])),
+            Text('\$${salePrice.toStringAsFixed(0)}', 
+                 style: const TextStyle(fontWeight: FontWeight.w500)),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Ganancia:', style: TextStyle(color: Colors.grey[600])),
+            Text('\$${profit.toStringAsFixed(0)} (${profitPercentage.toStringAsFixed(1)}%)', 
+                 style: TextStyle(
+                   fontWeight: FontWeight.w500,
+                   color: profit > 0 ? Colors.green : Colors.red,
+                 )),
+          ],
+        ),
+      ],
+    );
   }
 
   Future<void> _saveProduct() async {
@@ -77,6 +149,17 @@ class _AddProductFormState extends State<AddProductForm> {
             ? null 
             : double.parse(_costController.text.trim()),
         providerId: _selectedProvider?.key?.toString(),
+        salePrice: _usePercentage 
+            ? null
+            : (_salePriceController.text.trim().isEmpty 
+                ? null 
+                : double.parse(_salePriceController.text.trim())),
+        profitPercentage: _usePercentage 
+            ? (_profitPercentageController.text.trim().isEmpty 
+                ? null 
+                : double.parse(_profitPercentageController.text.trim()))
+            : null,
+        usePercentage: _usePercentage,
       );
 
       await box.add(product);
@@ -125,22 +208,22 @@ class _AddProductFormState extends State<AddProductForm> {
     final theme = Theme.of(context);
 
     return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             // Handle bar
             Center(
               child: Container(
@@ -266,6 +349,179 @@ class _AddProductFormState extends State<AddProductForm> {
             ),
             const SizedBox(height: 16),
 
+            // Price configuration section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.green.withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.attach_money, color: Colors.green, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Configuración de Precio de Venta',
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Toggle between fixed price and percentage
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _usePercentage = false;
+                              _profitPercentageController.clear();
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: !_usePercentage ? Colors.green : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: !_usePercentage ? Colors.green : Colors.grey,
+                              ),
+                            ),
+                            child: Text(
+                              'Precio Fijo',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: !_usePercentage ? Colors.white : Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _usePercentage = true;
+                              _salePriceController.clear();
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: _usePercentage ? Colors.green : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _usePercentage ? Colors.green : Colors.grey,
+                              ),
+                            ),
+                            child: Text(
+                              'Por Porcentaje',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _usePercentage ? Colors.white : Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Price input field
+                  if (!_usePercentage) ...[
+                    TextFormField(
+                      controller: _salePriceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Precio de venta',
+                        prefixIcon: Icon(Icons.sell),
+                        prefixText: '\$ ',
+                        border: OutlineInputBorder(),
+                        helperText: 'Precio al que vendes el producto',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      validator: (value) {
+                        if (value != null && value.trim().isNotEmpty) {
+                          final price = double.tryParse(value.trim());
+                          if (price == null || price < 0) {
+                            return 'Ingrese un precio válido';
+                          }
+                          if (price > 999999) {
+                            return 'El precio no puede exceder \$999,999';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                  ] else ...[
+                    TextFormField(
+                      controller: _profitPercentageController,
+                      decoration: const InputDecoration(
+                        labelText: 'Porcentaje de ganancia',
+                        prefixIcon: Icon(Icons.percent),
+                        suffixText: '%',
+                        border: OutlineInputBorder(),
+                        helperText: 'Ej: 50 para 50% de ganancia sobre el costo',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      validator: (value) {
+                        if (value != null && value.trim().isNotEmpty) {
+                          final percentage = double.tryParse(value.trim());
+                          if (percentage == null || percentage < 0) {
+                            return 'Ingrese un porcentaje válido';
+                          }
+                          if (percentage > 1000) {
+                            return 'El porcentaje no puede exceder 1000%';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                  
+                  // Preview calculation
+                  if (_costController.text.isNotEmpty && 
+                      ((_usePercentage && _profitPercentageController.text.isNotEmpty) ||
+                       (!_usePercentage && _salePriceController.text.isNotEmpty)))
+                    ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.blue.withOpacity(0.3),
+                        ),
+                      ),
+                      child: _buildPricePreview(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Provider dropdown (optional)
             ValueListenableBuilder<Box<Provider>>(
               valueListenable: Hive.box<Provider>('providers').listenable(),
@@ -310,10 +566,10 @@ class _AddProductFormState extends State<AddProductForm> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _getCategoryColor(_selectedCategory).withValues(alpha: 0.1),
+                color: _getCategoryColor(_selectedCategory).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _getCategoryColor(_selectedCategory).withValues(alpha: 0.3),
+                  color: _getCategoryColor(_selectedCategory).withOpacity(0.3),
                 ),
               ),
               child: Row(
@@ -340,10 +596,10 @@ class _AddProductFormState extends State<AddProductForm> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.purple.withValues(alpha: 0.1),
+                color: Colors.purple.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Colors.purple.withValues(alpha: 0.3),
+                  color: Colors.purple.withOpacity(0.3),
                 ),
               ),
               child: Row(
@@ -406,6 +662,8 @@ class _AddProductFormState extends State<AddProductForm> {
               child: const Text('Cancelar'),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

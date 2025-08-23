@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/provider.dart';
+import '../widgets/qr_code_dialog.dart';
+import '../widgets/edit_product_form.dart';
 import 'providers_screen.dart';
 
 class StockScreen extends StatelessWidget {
@@ -96,6 +98,18 @@ class ProductCard extends StatelessWidget {
     required this.product,
   });
 
+  void _showQRCode(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return QRCodeDialog(
+          productCode: product.code,
+          productName: product.name,
+        );
+      },
+    );
+  }
+
   Future<void> _deleteProduct(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -153,6 +167,20 @@ class ProductCard extends StatelessWidget {
           );
         }
       }
+    }
+  }
+
+  Future<void> _editProduct(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return EditProductForm(product: product);
+      },
+    );
+
+    if (result == true && context.mounted) {
+      // Product was successfully updated, no need for additional actions
+      // The UI will automatically update due to ValueListenableBuilder
     }
   }
 
@@ -309,7 +337,7 @@ class ProductCard extends StatelessWidget {
                 PopupMenuButton<String>(
                   icon: Icon(
                     Icons.more_vert,
-                    color: theme.iconTheme.color?.withValues(alpha: 0.7),
+                    color: theme.iconTheme.color?.withOpacity(0.7),
                     size: 20,
                   ),
                   onSelected: (value) {
@@ -317,9 +345,33 @@ class ProductCard extends StatelessWidget {
                       _deleteProduct(context);
                     } else if (value == 'edit') {
                       _editQuantity(context);
+                    } else if (value == 'edit_full') {
+                      _editProduct(context);
+                    } else if (value == 'qr') {
+                      _showQRCode(context);
                     }
                   },
                   itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'qr',
+                      child: Row(
+                        children: [
+                          Icon(Icons.qr_code, color: Colors.purple, size: 18),
+                          SizedBox(width: 8),
+                          Text('Ver código QR'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'edit_full',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_note, color: Colors.green, size: 18),
+                          SizedBox(width: 8),
+                          Text('Editar producto'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuItem<String>(
                       value: 'edit',
                       child: Row(
@@ -349,7 +401,7 @@ class ProductCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: product.quantityStatusColor.withValues(alpha: 0.1),
+                    color: product.quantityStatusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: product.quantityStatusColor,
@@ -395,37 +447,51 @@ class ProductCard extends StatelessWidget {
                 Icon(
                   Icons.qr_code,
                   size: 16,
-                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
+                  color: theme.iconTheme.color?.withOpacity(0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Código: ${product.formattedCode}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.iconTheme.color?.withValues(alpha: 0.7),
+                    color: theme.iconTheme.color?.withOpacity(0.7),
                     fontWeight: FontWeight.w500,
                     fontFamily: 'monospace',
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: Colors.purple.withValues(alpha: 0.3),
-                      width: 0.5,
+                GestureDetector(
+                  onTap: () => _showQRCode(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                  ),
-                  child: const Text(
-                    'QR',
-                    style: TextStyle(
-                      color: Colors.purple,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.purple.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.qr_code,
+                          color: Colors.purple,
+                          size: 14,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Ver QR',
+                          style: TextStyle(
+                            color: Colors.purple,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -439,7 +505,7 @@ class ProductCard extends StatelessWidget {
                 Icon(
                   Icons.numbers,
                   size: 16,
-                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
+                  color: theme.iconTheme.color?.withOpacity(0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -465,12 +531,12 @@ class ProductCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: product.quantity > 0 
-                              ? Colors.red.withValues(alpha: 0.1)
-                              : Colors.grey.withValues(alpha: 0.1),
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.grey.withOpacity(0.1),
                           border: Border.all(
                             color: product.quantity > 0 
-                                ? Colors.red.withValues(alpha: 0.3)
-                                : Colors.grey.withValues(alpha: 0.3),
+                                ? Colors.red.withOpacity(0.3)
+                                : Colors.grey.withOpacity(0.3),
                           ),
                         ),
                         child: Icon(
@@ -491,9 +557,9 @@ class ProductCard extends StatelessWidget {
                         height: 32,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.green.withValues(alpha: 0.1),
+                          color: Colors.green.withOpacity(0.1),
                           border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.3),
+                            color: Colors.green.withOpacity(0.3),
                           ),
                         ),
                         child: const Icon(
@@ -509,27 +575,87 @@ class ProductCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             
-            // Cost and provider info
-            if (product.hasCostInfo || product.hasProvider) ...[
+            // Cost and pricing info
+            if (product.hasCostInfo || product.hasSalePriceInfo || product.hasProvider) ...[
               if (product.hasCostInfo)
                 Row(
                   children: [
                     Icon(
-                      Icons.attach_money,
+                      Icons.shopping_cart,
                       size: 16,
-                      color: theme.iconTheme.color?.withValues(alpha: 0.7),
+                      color: Colors.red,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Costo: ${product.formattedCost}',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                        color: Colors.red[700],
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-              if (product.hasCostInfo && product.hasProvider)
+              if (product.hasCostInfo && product.hasSalePriceInfo)
+                const SizedBox(height: 6),
+              if (product.hasSalePriceInfo)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.sell,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Venta: ${product.formattedCalculatedSalePrice}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (product.usePercentage && product.profitPercentage != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          '${product.profitPercentage!.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              if (product.hasSalePriceInfo && product.hasCostInfo)
+                ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.trending_up,
+                      size: 16,
+                      color: Colors.purple,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Ganancia: ${product.formattedProfit}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.purple[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if ((product.hasCostInfo || product.hasSalePriceInfo) && product.hasProvider)
                 const SizedBox(height: 6),
               if (product.hasProvider)
                 ValueListenableBuilder<Box<Provider>>(
@@ -555,14 +681,14 @@ class ProductCard extends StatelessWidget {
                         Icon(
                           Icons.business,
                           size: 16,
-                          color: theme.iconTheme.color?.withValues(alpha: 0.7),
+                          color: theme.iconTheme.color?.withOpacity(0.7),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Proveedor: ${provider.name}',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -580,13 +706,13 @@ class ProductCard extends StatelessWidget {
                 Icon(
                   Icons.calendar_today,
                   size: 16,
-                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
+                  color: theme.iconTheme.color?.withOpacity(0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Agregado: ${product.formattedCreatedAt}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.8),
                   ),
                 ),
               ],

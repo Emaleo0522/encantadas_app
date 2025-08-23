@@ -4,7 +4,9 @@ import 'package:hive/hive.dart';
 import '../models/appointment.dart';
 
 class AddAppointmentForm extends StatefulWidget {
-  const AddAppointmentForm({super.key});
+  final Appointment? appointment;
+  
+  const AddAppointmentForm({super.key, this.appointment});
 
   @override
   State<AddAppointmentForm> createState() => _AddAppointmentFormState();
@@ -18,6 +20,17 @@ class _AddAppointmentFormState extends State<AddAppointmentForm> {
   
   DateTime _selectedDateTime = DateTime.now().add(const Duration(hours: 1));
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.appointment != null) {
+      _clientNameController.text = widget.appointment!.clientName;
+      _serviceController.text = widget.appointment!.serviceName;
+      _priceController.text = widget.appointment!.price.toString();
+      _selectedDateTime = widget.appointment!.dateTime;
+    }
+  }
 
   @override
   void dispose() {
@@ -75,25 +88,47 @@ class _AddAppointmentFormState extends State<AddAppointmentForm> {
     });
 
     try {
-      final box = Hive.box<Appointment>('appointments');
-      final appointment = Appointment(
-        clientName: _clientNameController.text.trim(),
-        dateTime: _selectedDateTime,
-        serviceName: _serviceController.text.trim(),
-        price: double.parse(_priceController.text.trim()),
-      );
-
-      await box.add(appointment);
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Turno guardado exitosamente'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
+      if (widget.appointment != null) {
+        // Editar turno existente
+        widget.appointment!.clientName = _clientNameController.text.trim();
+        widget.appointment!.serviceName = _serviceController.text.trim();
+        widget.appointment!.dateTime = _selectedDateTime;
+        widget.appointment!.price = double.parse(_priceController.text.trim());
+        
+        await widget.appointment!.save();
+        
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Turno editado exitosamente'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Crear nuevo turno
+        final box = Hive.box<Appointment>('appointments');
+        final appointment = Appointment(
+          clientName: _clientNameController.text.trim(),
+          dateTime: _selectedDateTime,
+          serviceName: _serviceController.text.trim(),
+          price: double.parse(_priceController.text.trim()),
         );
+
+        await box.add(appointment);
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Turno guardado exitosamente'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -150,7 +185,7 @@ class _AddAppointmentFormState extends State<AddAppointmentForm> {
 
             // Title
             Text(
-              'Nuevo Turno',
+              widget.appointment != null ? 'Editar Turno' : 'Nuevo Turno',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -282,8 +317,8 @@ class _AddAppointmentFormState extends State<AddAppointmentForm> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text(
-                      'Guardar turno',
+                  : Text(
+                      widget.appointment != null ? 'Actualizar turno' : 'Guardar turno',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
