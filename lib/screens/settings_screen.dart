@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:html' as html;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/app_settings.dart';
@@ -178,6 +181,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              
+              const SizedBox(height: 16),
+              
+              // Manual Backup Section
+              _buildManualBackupSection(),
               
               const SizedBox(height: 16),
               
@@ -843,6 +851,389 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       }
+    }
+  }
+
+  Widget _buildManualBackupSection() {
+    return _buildSectionCard(
+      title: 'Backup Manual',
+      icon: Icons.file_download,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.security, color: Colors.blue, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Backup de Seguridad',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[700],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Exporta e importa tus datos manualmente para mayor seguridad',
+                style: TextStyle(color: Colors.grey[700], fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Current Data Summary
+        FutureBuilder<Map<String, int>>(
+          future: _backupService.getCurrentDataSummary(),
+          builder: (context, snapshot) {
+            final data = snapshot.data ?? {};
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Datos Actuales:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 4,
+                    children: [
+                      _buildDataChip('Productos', data['products'] ?? 0),
+                      _buildDataChip('Ventas', data['transactions'] ?? 0),
+                      _buildDataChip('Citas', data['appointments'] ?? 0),
+                      _buildDataChip('Clientes', data['clientes_cuenta'] ?? 0),
+                      _buildDataChip('Proveedores', data['providers'] ?? 0),
+                      _buildDataChip('Cuentas', data['cuentas_corrientes'] ?? 0),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Action buttons
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _exportDataManually,
+                icon: const Icon(Icons.file_download),
+                label: const Text('Exportar Datos'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _importDataManually,
+                icon: const Icon(Icons.file_upload),
+                label: const Text('Importar Datos'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 12),
+        
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.amber.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amber.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info, color: Colors.amber[700], size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Tip: Exporta regularmente para tener respaldos locales',
+                  style: TextStyle(
+                    color: Colors.amber[700],
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDataChip(String label, int count) {
+    return Chip(
+      label: Text(
+        '$label: $count',
+        style: const TextStyle(fontSize: 11),
+      ),
+      backgroundColor: Colors.blue.withOpacity(0.1),
+      side: BorderSide(color: Colors.blue.withOpacity(0.3)),
+    );
+  }
+
+  Future<void> _exportDataManually() async {
+    try {
+      await _backupService.exportDataManually();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('Datos exportados exitosamente'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Error al exportar: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importDataManually() async {
+    if (kIsWeb) {
+      // For web: use file input
+      final input = html.FileUploadInputElement()
+        ..accept = '.json'
+        ..click();
+      
+      input.onChange.listen((e) async {
+        final files = input.files;
+        if (files?.isEmpty ?? true) return;
+        
+        final file = files!.first;
+        final reader = html.FileReader();
+        
+        reader.onLoadEnd.listen((e) async {
+          try {
+            final content = reader.result as String;
+            await _processImport(content);
+          } catch (e) {
+            _showImportError('Error reading file: $e');
+          }
+        });
+        
+        reader.readAsText(file);
+      });
+    } else {
+      // For mobile: would need file_picker package
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Import function needs file_picker package for mobile'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  Future<void> _processImport(String jsonContent) async {
+    try {
+      // Show confirmation dialog with preview
+      final shouldImport = await showDialog<bool>(
+        context: context,
+        builder: (context) => _buildImportConfirmationDialog(jsonContent),
+      );
+      
+      if (shouldImport == true) {
+        final success = await _backupService.importDataManually(jsonContent);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    success ? Icons.check_circle : Icons.error_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(success 
+                    ? '¡Datos importados exitosamente!' 
+                    : 'Error al importar datos'),
+                ],
+              ),
+              backgroundColor: success ? Colors.green : Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _showImportError('Error processing import: $e');
+    }
+  }
+
+  Widget _buildImportConfirmationDialog(String jsonContent) {
+    try {
+      final data = const JsonDecoder().convert(jsonContent) as Map<String, dynamic>;
+      
+      return AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Confirmar Importación'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '⚠️ ATENCIÓN: Esta acción reemplazará TODOS los datos actuales.',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Datos a importar:'),
+              const SizedBox(height: 8),
+              _buildImportDataPreview(data),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Importar'),
+          ),
+        ],
+      );
+    } catch (e) {
+      return AlertDialog(
+        title: const Text('Error'),
+        content: Text('Archivo JSON inválido: $e'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildImportDataPreview(Map<String, dynamic> data) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildPreviewRow('📦 Productos', data['products']?.length ?? 0),
+          _buildPreviewRow('💰 Transacciones', data['transactions']?.length ?? 0),
+          _buildPreviewRow('📅 Citas', data['appointments']?.length ?? 0),
+          _buildPreviewRow('🏪 Proveedores', data['providers']?.length ?? 0),
+          _buildPreviewRow('👥 Clientes', data['clientes_cuenta']?.length ?? 0),
+          _buildPreviewRow('💳 Cuentas', data['cuentas_corrientes']?.length ?? 0),
+          if (data['metadata']?['timestamp'] != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '📅 Backup del: ${data['metadata']['timestamp']}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewRow(String label, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13)),
+          Text('$count', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  void _showImportError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
   }
 }

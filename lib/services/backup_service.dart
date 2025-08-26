@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js' as js;
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_browser.dart' as auth;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import '../models/product.dart';
 import '../models/transaction.dart';
 import '../models/appointment.dart';
@@ -732,6 +734,117 @@ class BackupService {
   Future<void> forcSync() async {
     if (_isAuthenticated && _hasInternetConnection) {
       await _performSync();
+    }
+  }
+
+  /// Export data manually to JSON file
+  Future<void> exportDataManually() async {
+    try {
+      debugPrint('🔄 Exporting data manually...');
+      
+      // Collect all data
+      final backupData = await _collectAllData();
+      
+      // Convert to JSON string
+      final jsonString = const JsonEncoder.withIndent('  ').convert(backupData);
+      
+      if (kIsWeb) {
+        // For web: create download link
+        final bytes = utf8.encode(jsonString);
+        final blob = html.Blob([bytes], 'application/json');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        
+        final anchor = html.AnchorElement(href: url)
+          ..target = 'blank'
+          ..download = 'encantadas_backup_${DateTime.now().toIso8601String().split('T')[0]}.json'
+          ..click();
+        
+        html.Url.revokeObjectUrl(url);
+        debugPrint('✅ Manual export completed (web download)');
+      } else {
+        // For mobile: save to documents
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/encantadas_backup_${DateTime.now().toIso8601String().split('T')[0]}.json');
+        await file.writeAsString(jsonString);
+        debugPrint('✅ Manual export completed: ${file.path}');
+      }
+      
+    } catch (e) {
+      debugPrint('❌ Manual export failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Import data manually from JSON file
+  Future<bool> importDataManually(String jsonContent) async {
+    try {
+      debugPrint('🔄 Importing data manually...');
+      
+      // Parse JSON
+      final data = jsonDecode(jsonContent) as Map<String, dynamic>;
+      
+      // Validate data structure
+      if (!_validateBackupData(data)) {
+        throw Exception('Invalid backup file format');
+      }
+      
+      // Show confirmation dialog would be handled in UI
+      debugPrint('📊 Data to import:');
+      debugPrint('- Products: ${data['products']?.length ?? 0}');
+      debugPrint('- Transactions: ${data['transactions']?.length ?? 0}');
+      debugPrint('- Appointments: ${data['appointments']?.length ?? 0}');
+      debugPrint('- Providers: ${data['providers']?.length ?? 0}');
+      debugPrint('- Suppliers: ${data['suppliers']?.length ?? 0}');
+      debugPrint('- Clientes cuenta: ${data['clientes_cuenta']?.length ?? 0}');
+      debugPrint('- Cuentas corrientes: ${data['cuentas_corrientes']?.length ?? 0}');
+      debugPrint('- Movimientos cuenta: ${data['movimientos_cuenta']?.length ?? 0}');
+      
+      // Restore all data
+      await _restoreAllData(data);
+      
+      debugPrint('✅ Manual import completed successfully');
+      return true;
+      
+    } catch (e) {
+      debugPrint('❌ Manual import failed: $e');
+      return false;
+    }
+  }
+
+  /// Validate backup data structure
+  bool _validateBackupData(Map<String, dynamic> data) {
+    final requiredFields = [
+      'products', 'transactions', 'appointments', 
+      'providers', 'suppliers', 'clientes_cuenta', 
+      'cuentas_corrientes', 'movimientos_cuenta'
+    ];
+    
+    for (final field in requiredFields) {
+      if (!data.containsKey(field) || data[field] is! List) {
+        debugPrint('❌ Missing or invalid field: $field');
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  /// Get current data summary for UI display
+  Future<Map<String, int>> getCurrentDataSummary() async {
+    try {
+      return {
+        'products': Hive.box<Product>('products').length,
+        'transactions': Hive.box<Transaction>('transactions').length,
+        'appointments': Hive.box<Appointment>('appointments').length,
+        'providers': Hive.box<Provider>('providers').length,
+        'suppliers': Hive.box<Supplier>('suppliers').length,
+        'clientes_cuenta': Hive.box<Cliente>('clientes_cuenta').length,
+        'cuentas_corrientes': Hive.box<CuentaCorriente>('cuentas_corrientes').length,
+        'movimientos_cuenta': Hive.box<MovimientoCuenta>('movimientos_cuenta').length,
+      };
+    } catch (e) {
+      debugPrint('Error getting data summary: $e');
+      return {};
     }
   }
 
