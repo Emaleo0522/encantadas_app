@@ -5,6 +5,7 @@ import '../models/product.dart';
 import '../models/provider.dart';
 import '../utils/product_code_generator.dart';
 import 'tags_input.dart';
+import 'product_image_picker.dart';
 
 class AddProductForm extends StatefulWidget {
   const AddProductForm({super.key});
@@ -27,6 +28,7 @@ class _AddProductFormState extends State<AddProductForm> {
   String _previewCode = '';
   bool _usePercentage = false;
   List<String> _tags = [];
+  String? _imageId;
 
   @override
   void initState() {
@@ -163,6 +165,7 @@ class _AddProductFormState extends State<AddProductForm> {
             : null,
         usePercentage: _usePercentage,
         tags: _tags.isEmpty ? null : List<String>.from(_tags),
+        imageId: _imageId,
       );
 
       await box.add(product);
@@ -249,6 +252,16 @@ class _AddProductFormState extends State<AddProductForm> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
+
+            // Foto del producto (subida a backend, opcional)
+            Center(
+              child: ProductImagePicker(
+                initialImageId: null,
+                productCode: _previewCode,
+                onImageChanged: (id) => _imageId = id,
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Product name field
             TextFormField(

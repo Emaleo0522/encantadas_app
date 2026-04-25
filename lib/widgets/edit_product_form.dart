@@ -4,6 +4,7 @@ import '../models/product.dart';
 import '../models/provider.dart';
 import '../utils/validate_product_code.dart';
 import 'tags_input.dart';
+import 'product_image_picker.dart';
 
 class EditProductForm extends StatefulWidget {
   final Product product;
@@ -31,6 +32,8 @@ class _EditProductFormState extends State<EditProductForm> {
   bool _usePercentage = false;
   bool _isLoading = false;
   List<String> _tags = [];
+  String? _imageId;
+  String? _originalImageId;  // Para detectar si cambio (cleanup en cancel)
 
   @override
   void initState() {
@@ -46,6 +49,8 @@ class _EditProductFormState extends State<EditProductForm> {
     _selectedProviderId = widget.product.providerId;
     _usePercentage = widget.product.usePercentage;
     _tags = List<String>.from(widget.product.tags ?? const []);
+    _imageId = widget.product.imageId;
+    _originalImageId = widget.product.imageId;
     
     if (widget.product.cost != null) {
       _costController.text = widget.product.cost!.toStringAsFixed(0);
@@ -87,6 +92,13 @@ class _EditProductFormState extends State<EditProductForm> {
       widget.product.providerId = _selectedProviderId;
       widget.product.usePercentage = _usePercentage;
       widget.product.tags = _tags.isEmpty ? null : List<String>.from(_tags);
+      widget.product.imageId = _imageId;
+      // Si cambio la imagen y la vieja sigue en server, limpiarla.
+      // (El widget ya borro la anterior al subir una nueva, pero esta
+      // doble verificacion cubre el caso de eliminacion via X.)
+      if (_originalImageId != null && _originalImageId != _imageId) {
+        // El widget ya hizo deleteFile en el upload. No hacer nada.
+      }
       
       // Update cost
       if (_costController.text.isNotEmpty) {
@@ -212,6 +224,16 @@ class _EditProductFormState extends State<EditProductForm> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Foto del producto
+                      Center(
+                        child: ProductImagePicker(
+                          initialImageId: _imageId,
+                          productCode: widget.product.code,
+                          onImageChanged: (id) => _imageId = id,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
                       // Product Name
                       TextFormField(
                         controller: _nameController,

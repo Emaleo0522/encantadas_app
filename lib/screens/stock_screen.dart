@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/provider.dart';
+import '../services/pocketbase_sync_service.dart';
 import '../utils/text_search.dart';
 import '../widgets/qr_code_dialog.dart';
 import '../widgets/edit_product_form.dart';
@@ -483,7 +484,18 @@ class ProductCard extends StatelessWidget {
 
     if (confirmed == true) {
       try {
+        // Cleanup: borrar imagen asociada del backend (si existe).
+        // Tolerante a fallos: si falla el borrado remoto, igual eliminamos
+        // el producto local (la imagen huerfana se puede limpiar despues).
+        final imageToCleanup = product.imageId;
+
         await product.delete();
+
+        if (imageToCleanup != null && imageToCleanup.isNotEmpty) {
+          // Fire-and-forget — no esperamos al cleanup remoto
+          PocketBaseSyncService.instance.deleteFile(imageToCleanup);
+        }
+
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -660,6 +672,10 @@ class ProductCard extends StatelessWidget {
           children: [
             Row(
               children: [
+                if (product.hasImage) ...[
+                  _ProductThumbnail(imageId: product.imageId!, productName: product.name),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Text(
                     product.name,
@@ -1017,6 +1033,98 @@ class ProductCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Thumbnail compacto que resuelve la URL del archivo asincronamente.
+/// Click expande imagen full-screen.
+class _ProductThumbnail extends StatefulWidget {
+  final String imageId;
+  final String productName;
+
+  const _ProductThumbnail({required this.imageId, required this.productName});
+
+  @override
+  State<_ProductThumbnail> createState() => _ProductThumbnailState();
+}
+
+class _ProductThumbnailState extends State<_ProductThumbnail> {
+  String? _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUrl();
+  }
+
+  Future<void> _loadUrl() async {
+    final u = await PocketBaseSyncService.instance.getFileUrlAsync(
+      widget.imageId,
+      thumb: true,
+    );
+    if (mounted) setState(() => _url = u);
+  }
+
+  void _openFullScreen() {
+    if (_url == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Image.network(
+                _url!.replaceAll('thumb=120x120', ''),
+                fit: BoxFit.contain,
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black54,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: _openFullScreen,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: _url == null
+            ? const Center(
+                child: SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : Image.network(
+                _url!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.broken_image, size: 20, color: Colors.grey),
+              ),
       ),
     );
   }

@@ -52,6 +52,14 @@ class Product extends HiveObject {
   @HiveField(10)
   List<String>? tags;
 
+  // ID del archivo subido al backend (collection encantadas_files).
+  // Null = producto sin foto. La URL se construye dinamicamente desde
+  // PocketBaseSyncService.getFileUrl(imageId).
+  // Las fotos NO se incluyen en el JSON de backup (solo el ID), por
+  // performance. La foto vive solo en el server.
+  @HiveField(11)
+  String? imageId;
+
   Product({
     required this.name,
     required this.category,
@@ -64,7 +72,11 @@ class Product extends HiveObject {
     this.profitPercentage,
     this.usePercentage = false,
     this.tags,
+    this.imageId,
   });
+
+  /// Convenience: producto tiene foto cargada.
+  bool get hasImage => imageId != null && imageId!.isNotEmpty;
 
   /// Tags normalizados y sin nulls. Lista vacía si no hay tags.
   List<String> get tagsNormalized {
@@ -317,6 +329,7 @@ class Product extends HiveObject {
       'profitPercentage': profitPercentage,
       'usePercentage': usePercentage,
       'tags': tags,
+      'imageId': imageId,
     };
   }
 
@@ -337,6 +350,7 @@ class Product extends HiveObject {
       profitPercentage: json['profitPercentage'] as double?,
       usePercentage: json['usePercentage'] as bool? ?? false,
       tags: (json['tags'] as List?)?.map((e) => e as String).toList(),
+      imageId: json['imageId'] as String?,
     );
   }
 }

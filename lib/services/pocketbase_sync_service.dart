@@ -4,6 +4,7 @@ import 'dart:html' as html;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:pocketbase/pocketbase.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
@@ -241,6 +242,91 @@ class PocketBaseSyncService {
       return true;
     } catch (e) {
       debugPrint('PB Sync: delete failed: $e');
+      return false;
+    }
+  }
+
+  // ─── Files (imagenes de productos) ─────────────────────────────────────
+  static const String _filesCollection = 'encantadas_files';
+
+  /// Sube un archivo (imagen de producto) y devuelve el ID del record creado.
+  /// `kind` ej: "product_image", `refId` ej: codigo del producto "P-001".
+  /// El cliente debe llamar `getFileUrl(returnedId)` para mostrar el archivo.
+  Future<String?> uploadFile({
+    required String kind,
+    required String refId,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    if (!_isAuthenticated) {
+      debugPrint('PB Sync: uploadFile sin auth');
+      return null;
+    }
+    try {
+      final userId = _pb.authStore.record?.id;
+      if (userId == null) return null;
+
+      final record = await _pb.collection(_filesCollection).create(
+        body: {
+          'owner': userId,
+          'kind': kind,
+          'ref_id': refId,
+        },
+        files: [
+          http.MultipartFile.fromBytes('file', bytes, filename: filename),
+        ],
+      );
+      return record.id;
+    } catch (e) {
+      debugPrint('PB Sync: uploadFile failed: $e');
+      return null;
+    }
+  }
+
+  /// Devuelve la URL publica del archivo (para `<img src=>`).
+  /// Si fileId es null o no estamos auth, devuelve null.
+  String? getFileUrl(String? fileId, {String? thumb}) {
+    if (fileId == null || fileId.isEmpty) return null;
+    try {
+      // PocketBase URL pattern: /api/files/{collectionId}/{recordId}/{filename}
+      // Pero como guardamos solo el record ID, hacemos GET para obtener el filename.
+      // Mejor: usamos el helper buildFileUrl que necesita el record. Como no lo
+      // tenemos cacheado, construimos a mano usando un ID del archivo.
+      // PB acepta el formato `/api/files/<collection>/<recordId>/<filename>`,
+      // pero `<filename>` es desconocido sin un fetch. Usamos la API auxiliar.
+      // Solucion: cliente debe pasar a `getFile` que devuelve URL via record.
+      // Para simplicidad, dejamos un wrapper que requiere obtener el filename.
+      return null; // Implementacion via getFileUrlAsync abajo.
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Obtiene URL del archivo de forma asincrona (hace fetch del record para
+  /// resolver el filename y construir la URL final firmada/publica).
+  Future<String?> getFileUrlAsync(String? fileId, {bool thumb = false}) async {
+    if (fileId == null || fileId.isEmpty || !_isAuthenticated) return null;
+    try {
+      final record = await _pb.collection(_filesCollection).getOne(fileId);
+      final filename = record.getStringValue('file');
+      if (filename.isEmpty) return null;
+      final url = _pb.files.getURL(record, filename, thumb: thumb ? '120x120' : '');
+      return url.toString();
+    } catch (e) {
+      debugPrint('PB Sync: getFileUrlAsync failed: $e');
+      return null;
+    }
+  }
+
+  /// Borra un archivo del backend. Tolerante a fallos (offline / id invalido).
+  Future<bool> deleteFile(String? fileId) async {
+    if (fileId == null || fileId.isEmpty) return true;
+    if (!_isAuthenticated) return false;
+    try {
+      await _pb.collection(_filesCollection).delete(fileId);
+      return true;
+    } catch (e) {
+      debugPrint('PB Sync: deleteFile failed (id=$fileId): $e');
       return false;
     }
   }
