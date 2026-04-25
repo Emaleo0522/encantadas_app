@@ -64,12 +64,18 @@ dependencies:
   # Pie Chart for visualizations
   pie_chart: ^5.4.0
   
-  # Google Drive API for automatic backup
+  # Backend sync (PocketBase self-hosted)
+  pocketbase: ^0.22.0
+
+  # Google Drive API (legacy backup, todavia usado mientras se migra)
   googleapis: ^13.2.0
   googleapis_auth: ^1.6.0
-  
+
   # HTTP client
   http: ^1.2.0
+
+  # Crypto para hash sha256 de payloads
+  crypto: ^3.0.3
   
   # Connectivity checking
   connectivity_plus: ^6.0.2

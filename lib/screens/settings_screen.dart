@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/app_settings.dart';
 import '../services/backup_service.dart';
+import '../services/pocketbase_sync_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -184,12 +185,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               
               const SizedBox(height: 16),
               
-              // Manual Backup Section
-              _buildManualBackupSection(),
-              
+              // PocketBase Sync (nuevo, reemplaza Drive)
+              _buildPocketBaseSyncSection(),
+
               const SizedBox(height: 16),
-              
-              // Backup Settings Section
+
+              // Manual Backup Section (export/import JSON)
+              _buildManualBackupSection(),
+
+              const SizedBox(height: 16),
+
+              // Backup Settings Section (Google Drive legacy)
               _buildBackupSection(),
               
               const SizedBox(height: 16),
@@ -1234,6 +1240,371 @@ class _SettingsScreenState extends State<SettingsScreen> {
           duration: const Duration(seconds: 5),
         ),
       );
+    }
+  }
+
+  // ─── PocketBase Sync (nuevo, reemplaza Drive) ─────────────────────────
+  Widget _buildPocketBaseSyncSection() {
+    final sync = PocketBaseSyncService.instance;
+    return StreamBuilder<SyncStatus>(
+      stream: sync.statusStream,
+      builder: (context, snapshot) {
+        final status = snapshot.data ??
+            (sync.isAuthenticated ? SyncStatus.authenticated : SyncStatus.disconnected);
+        return _buildSectionCard(
+          title: 'Sincronización en la nube',
+          icon: Icons.cloud_sync,
+          children: [
+            if (!sync.isAuthenticated) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Tus datos se respaldan automáticamente en un servidor seguro. '
+                  'Sin costo, sin Google Drive.',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: status == SyncStatus.connecting ? null : _showSyncLoginDialog,
+                icon: status == SyncStatus.connecting
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.login),
+                label: Text(status == SyncStatus.connecting
+                    ? 'Conectando...'
+                    : 'Conectar a la nube'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Icon(_syncStatusIcon(status), color: _syncStatusColor(status), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_syncStatusLabel(status),
+                            style: TextStyle(
+                                color: _syncStatusColor(status),
+                                fontWeight: FontWeight.w600)),
+                        if (sync.currentEmail != null)
+                          Text(sync.currentEmail!,
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: status == SyncStatus.syncing
+                          ? null
+                          : () async {
+                              final ok = await sync.forceSync();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        ok ? '✓ Sincronizado' : '✗ Falló la sincronización'),
+                                    backgroundColor:
+                                        ok ? Colors.green : Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                      icon: status == SyncStatus.syncing
+                          ? const SizedBox(
+                              width: 14, height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.sync),
+                      label: const Text('Sincronizar ahora'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showBackupHistory,
+                      icon: const Icon(Icons.history),
+                      label: const Text('Historial'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () async {
+                  await sync.logout();
+                  if (mounted) setState(() {});
+                },
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Desconectar'),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  IconData _syncStatusIcon(SyncStatus s) {
+    switch (s) {
+      case SyncStatus.synced: return Icons.cloud_done;
+      case SyncStatus.syncing: return Icons.cloud_sync;
+      case SyncStatus.authenticated: return Icons.cloud_outlined;
+      case SyncStatus.syncFailed: return Icons.cloud_off;
+      case SyncStatus.connecting: return Icons.cloud_queue;
+      case SyncStatus.authFailed: return Icons.error_outline;
+      case SyncStatus.disconnected: return Icons.cloud_off;
+    }
+  }
+
+  Color _syncStatusColor(SyncStatus s) {
+    switch (s) {
+      case SyncStatus.synced: return Colors.green;
+      case SyncStatus.syncing: return Colors.blue;
+      case SyncStatus.authenticated: return Colors.indigo;
+      case SyncStatus.syncFailed:
+      case SyncStatus.authFailed: return Colors.red;
+      case SyncStatus.connecting: return Colors.orange;
+      case SyncStatus.disconnected: return Colors.grey;
+    }
+  }
+
+  String _syncStatusLabel(SyncStatus s) {
+    switch (s) {
+      case SyncStatus.synced: return 'Datos sincronizados';
+      case SyncStatus.syncing: return 'Sincronizando...';
+      case SyncStatus.authenticated: return 'Conectado';
+      case SyncStatus.syncFailed: return 'Falló la sincronización';
+      case SyncStatus.connecting: return 'Conectando...';
+      case SyncStatus.authFailed: return 'Error de autenticación';
+      case SyncStatus.disconnected: return 'Desconectado';
+    }
+  }
+
+  Future<void> _showSyncLoginDialog() async {
+    final emailCtl = TextEditingController(text: 'cliente@encantadas.app');
+    final pwdCtl = TextEditingController();
+    bool obscure = true;
+    bool loading = false;
+    String? errorMsg;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
+        return AlertDialog(
+          title: const Text('Conectar sincronización'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Ingresá las credenciales que te dió el administrador.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailCtl,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: pwdCtl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'Contraseña',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setSt(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 8),
+                Text(errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: loading
+                  ? null
+                  : () async {
+                      setSt(() {
+                        loading = true;
+                        errorMsg = null;
+                      });
+                      final ok = await PocketBaseSyncService.instance.login(
+                        emailCtl.text.trim(),
+                        pwdCtl.text,
+                      );
+                      if (ok) {
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                        if (mounted) setState(() {});
+                      } else {
+                        setSt(() {
+                          loading = false;
+                          errorMsg = 'Credenciales inválidas o servidor no disponible';
+                        });
+                      }
+                    },
+              child: loading
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Conectar'),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Future<void> _showBackupHistory() async {
+    final sync = PocketBaseSyncService.instance;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Historial de respaldos'),
+        content: SizedBox(
+          width: 400,
+          child: FutureBuilder<List<SyncBackupInfo>>(
+            future: sync.listBackups(limit: 30),
+            builder: (ctx, snap) {
+              if (!snap.hasData) {
+                return const SizedBox(
+                  height: 100,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final list = snap.data!;
+              if (list.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: Text('No hay respaldos aún. Hacé click en Sincronizar.')),
+                );
+              }
+              return ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 400),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final b = list[i];
+                    final date = b.created.toLocal();
+                    final dateStr = '${date.day.toString().padLeft(2, '0')}/'
+                        '${date.month.toString().padLeft(2, '0')}/'
+                        '${date.year} ${date.hour.toString().padLeft(2, '0')}:'
+                        '${date.minute.toString().padLeft(2, '0')}';
+                    final stats = b.stats ?? {};
+                    final p = stats['products'] ?? 0;
+                    final t = stats['transactions'] ?? 0;
+                    return ListTile(
+                      dense: true,
+                      title: Text(dateStr),
+                      subtitle: Text('$p productos · $t ventas'),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (v) async {
+                          if (v == 'restore') {
+                            Navigator.of(ctx).pop();
+                            _confirmRestore(b);
+                          } else if (v == 'delete') {
+                            await sync.deleteBackup(b.id);
+                            if (mounted) Navigator.of(ctx).pop();
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'restore',
+                            child: Row(children: [
+                              Icon(Icons.restore, size: 18, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text('Restaurar'),
+                            ]),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(children: [
+                              Icon(Icons.delete, size: 18, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Eliminar'),
+                            ]),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmRestore(SyncBackupInfo backup) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Restaurar este respaldo?'),
+        content: Text(
+          'Esto va a reemplazar TODOS los datos actuales con el respaldo del '
+          '${backup.created.toLocal()}. La acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Restaurar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final result = await PocketBaseSyncService.instance.restoreBackup(backup.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result ? '✓ Datos restaurados' : '✗ Error al restaurar'),
+            backgroundColor: result ? Colors.green : Colors.red,
+          ),
+        );
+      }
     }
   }
 }

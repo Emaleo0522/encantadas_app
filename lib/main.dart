@@ -26,6 +26,7 @@ import 'screens/providers_screen.dart';
 import 'screens/cuenta_corriente_screen.dart';
 import 'widgets/qr_processing_dialog.dart';
 import 'services/backup_service.dart';
+import 'services/pocketbase_sync_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -59,9 +60,10 @@ void main() async {
   
   await initializeNotifications();
   
-  // Initialize backup service
+  // Initialize backup service (Drive legacy + nuevo PocketBase sync)
   await BackupService.instance.initialize();
-  
+  await PocketBaseSyncService.instance.initialize();
+
   runApp(const EncantadasApp());
 }
 
