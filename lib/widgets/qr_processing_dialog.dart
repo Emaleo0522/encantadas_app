@@ -32,24 +32,15 @@ class _QRProcessingDialogState extends State<QRProcessingDialog> {
 
     final productsBox = Hive.box<Product>('products');
     final allProducts = productsBox.values.toList().cast<Product>();
+    final normalizedScan = widget.qrCode.trim();
 
+    // Match SOLO por código exacto. Búsqueda por substring de nombre se
+    // eliminó porque generaba ventas del producto equivocado.
     Product? foundProduct;
-
-    // First search by exact code
     for (final product in allProducts) {
-      if (product.code == widget.qrCode) {
+      if (product.code == normalizedScan) {
         foundProduct = product;
         break;
-      }
-    }
-
-    // If not found by code, search by name containing the code
-    if (foundProduct == null) {
-      for (final product in allProducts) {
-        if (product.name.toLowerCase().contains(widget.qrCode.toLowerCase())) {
-          foundProduct = product;
-          break;
-        }
       }
     }
 
@@ -85,10 +76,14 @@ class _QRProcessingDialogState extends State<QRProcessingDialog> {
         ? product.calculatedSalePrice
         : (product.cost ?? 0.0);
 
+    final originalQuantity = product.quantity;
+    bool stockDecremented = false;
+
     try {
       // Update product stock
       product.quantity -= quantity;
       await product.save();
+      stockDecremented = true;
 
       // Create transaction
       final transactionsBox = Hive.box<Transaction>('transactions');
@@ -100,6 +95,7 @@ class _QRProcessingDialogState extends State<QRProcessingDialog> {
         clientName: '',
         serviceName: '',
         productName: product.name,
+        productCode: product.code,
         quantity: quantity,
         unitPrice: unitPrice,
       );
@@ -127,6 +123,13 @@ class _QRProcessingDialogState extends State<QRProcessingDialog> {
         );
       }
     } catch (e) {
+      // Rollback de stock si la transacción falló después del decremento.
+      if (stockDecremented) {
+        try {
+          product.quantity = originalQuantity;
+          await product.save();
+        } catch (_) {}
+      }
       if (mounted) {
         setState(() {
           _error = 'Error al procesar venta: $e';
@@ -220,9 +223,9 @@ class _QRProcessingDialogState extends State<QRProcessingDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

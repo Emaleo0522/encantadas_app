@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/provider.dart';
 import '../utils/validate_product_code.dart';
+import 'tags_input.dart';
 
 class EditProductForm extends StatefulWidget {
   final Product product;
@@ -29,6 +30,7 @@ class _EditProductFormState extends State<EditProductForm> {
   String? _selectedProviderId;
   bool _usePercentage = false;
   bool _isLoading = false;
+  List<String> _tags = [];
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _EditProductFormState extends State<EditProductForm> {
     _selectedCategory = widget.product.category;
     _selectedProviderId = widget.product.providerId;
     _usePercentage = widget.product.usePercentage;
+    _tags = List<String>.from(widget.product.tags ?? const []);
     
     if (widget.product.cost != null) {
       _costController.text = widget.product.cost!.toStringAsFixed(0);
@@ -83,6 +86,7 @@ class _EditProductFormState extends State<EditProductForm> {
       widget.product.category = _selectedCategory;
       widget.product.providerId = _selectedProviderId;
       widget.product.usePercentage = _usePercentage;
+      widget.product.tags = _tags.isEmpty ? null : List<String>.from(_tags);
       
       // Update cost
       if (_costController.text.isNotEmpty) {
@@ -167,7 +171,7 @@ class _EditProductFormState extends State<EditProductForm> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: theme.primaryColor.withOpacity(0.1),
+                color: theme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
@@ -349,7 +353,23 @@ class _EditProductFormState extends State<EditProductForm> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
+                      // Tags personalizados
+                      ValueListenableBuilder<Box<Product>>(
+                        valueListenable: Hive.box<Product>('products').listenable(),
+                        builder: (context, box, _) {
+                          final allTags = collectAllTags(box.values);
+                          return TagsInput(
+                            initialTags: _tags,
+                            onChanged: (newTags) => _tags = newTags,
+                            suggestions: allTags,
+                            label: 'Tags (opcional)',
+                            hint: 'Ej: verano, oferta, regalo...',
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
                       // Cost
                       TextFormField(
                         controller: _costController,

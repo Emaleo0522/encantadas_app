@@ -102,31 +102,21 @@ class _AddSaleFormState extends State<AddSaleForm> {
   }
 
   void _onQRCodeScanned(String scannedCode) {
-    // Buscar producto por código QR
+    // Buscar producto SOLO por código exacto. La heurística previa de
+    // "nombre contiene código" generaba falsos positivos (vender un
+    // producto por escanear el QR de otro).
     final productsBox = Hive.box<Product>('products');
     final allProducts = productsBox.values.toList().cast<Product>();
-    
-    // Buscar producto que coincida con el código escaneado
+    final normalizedScan = scannedCode.trim();
+
     Product? foundProduct;
-    
-    // Primero buscar por código exacto
     for (final product in allProducts) {
-      if (product.code == scannedCode) {
+      if (product.code == normalizedScan) {
         foundProduct = product;
         break;
       }
     }
-    
-    // Si no se encuentra por código, buscar por nombre que contenga el código
-    if (foundProduct == null) {
-      for (final product in allProducts) {
-        if (product.name.toLowerCase().contains(scannedCode.toLowerCase())) {
-          foundProduct = product;
-          break;
-        }
-      }
-    }
-    
+
     if (foundProduct != null) {
       // Verificar que tenga stock
       if (foundProduct.quantity > 0) {
@@ -224,10 +214,14 @@ class _AddSaleFormState extends State<AddSaleForm> {
       _isLoading = true;
     });
 
+    final originalQuantity = product.quantity;
+    bool stockDecremented = false;
+
     try {
       // Actualizar stock del producto
       product.quantity -= quantity;
       await product.save();
+      stockDecremented = true;
 
       // Crear transacción
       final transactionsBox = Hive.box<Transaction>('transactions');
@@ -236,9 +230,10 @@ class _AddSaleFormState extends State<AddSaleForm> {
         amount: total,
         date: DateTime.now(),
         source: 'venta',
-        clientName: '', 
+        clientName: '',
         serviceName: '',
         productName: product.name,
+        productCode: product.code,
         quantity: quantity,
         unitPrice: unitPrice,
       );
@@ -307,6 +302,13 @@ class _AddSaleFormState extends State<AddSaleForm> {
         );
       }
     } catch (e) {
+      // Rollback de stock si la creación de la transacción falló.
+      if (stockDecremented) {
+        try {
+          product.quantity = originalQuantity;
+          await product.save();
+        } catch (_) {}
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -378,10 +380,14 @@ class _AddSaleFormState extends State<AddSaleForm> {
       _isLoading = true;
     });
 
+    final originalQuantity = _selectedProduct!.quantity;
+    bool stockDecremented = false;
+
     try {
       // Update product stock
       _selectedProduct!.quantity -= quantity;
       await _selectedProduct!.save();
+      stockDecremented = true;
 
       // Create transaction
       final transactionsBox = Hive.box<Transaction>('transactions');
@@ -392,6 +398,7 @@ class _AddSaleFormState extends State<AddSaleForm> {
         clientName: '', // Not used for product sales
         serviceName: '', // Not used for product sales
         productName: _selectedProduct!.name,
+        productCode: _selectedProduct!.code,
         quantity: quantity,
         unitPrice: unitPrice,
       );
@@ -419,6 +426,18 @@ class _AddSaleFormState extends State<AddSaleForm> {
         );
       }
     } catch (e) {
+      // Rollback: si decrementamos stock pero falló crear la transacción,
+      // restauramos el stock original para no dejar inconsistencia.
+      if (stockDecremented) {
+        try {
+          _selectedProduct!.quantity = originalQuantity;
+          await _selectedProduct!.save();
+        } catch (_) {
+          // Si el rollback también falla no hay mucho más que hacer,
+          // pero al menos avisamos en el mensaje al usuario.
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -429,9 +448,11 @@ class _AddSaleFormState extends State<AddSaleForm> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -551,9 +572,9 @@ class _AddSaleFormState extends State<AddSaleForm> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -650,9 +671,9 @@ class _AddSaleFormState extends State<AddSaleForm> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       children: [

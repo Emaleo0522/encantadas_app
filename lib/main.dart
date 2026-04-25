@@ -9,7 +9,6 @@ import 'models/appointment.dart';
 import 'models/transaction.dart';
 import 'models/product.dart';
 import 'models/provider.dart';
-import 'models/supplier.dart';
 import 'models/app_settings.dart';
 import 'models/cliente.dart';
 import 'models/cuenta_corriente.dart';
@@ -42,7 +41,6 @@ void main() async {
   Hive.registerAdapter(ProductCategoryAdapter());
   Hive.registerAdapter(ProductAdapter());
   Hive.registerAdapter(ProviderAdapter());
-  Hive.registerAdapter(SupplierAdapter());
   Hive.registerAdapter(AppSettingsAdapter());
   Hive.registerAdapter(ClienteAdapter());
   Hive.registerAdapter(CuentaCorrienteAdapter());
@@ -54,7 +52,6 @@ void main() async {
   await Hive.openBox<Transaction>('transactions');
   await Hive.openBox<Product>('products');
   await Hive.openBox<Provider>('providers');
-  await Hive.openBox<Supplier>('suppliers');
   await Hive.openBox<AppSettings>('settings');
   await Hive.openBox<Cliente>('clientes_cuenta');
   await Hive.openBox<CuentaCorriente>('cuentas_corrientes');
@@ -181,8 +178,21 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => MainNavigationScreenState();
 }
 
+// Indices estables del bottom nav. Si reordenas la lista de pantallas
+// actualiza estas constantes — el deep link de QR (kTabVentas) y los
+// FABs por pantalla dependen de estos valores.
+class NavTab {
+  static const int home = 0;
+  static const int turnos = 1;
+  static const int stock = 2;
+  static const int ventas = 3;
+  static const int balance = 4;
+  static const int providers = 5;
+  static const int fiado = 6;
+}
+
 class MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _selectedIndex = 0;
+  int _selectedIndex = NavTab.home;
 
   @override
   void initState() {
@@ -196,9 +206,8 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _handleExternalQRCode(String qrCode) {
-    // Navigate to sales tab
     setState(() {
-      _selectedIndex = 3; // VentasScreen index
+      _selectedIndex = NavTab.ventas;
     });
 
     // Show QR processing dialog after a short delay
@@ -275,7 +284,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
   // Get the FAB for the current screen
   Widget? _getCurrentFAB() {
     switch (_selectedIndex) {
-      case 1: // TurnosScreen
+      case NavTab.turnos:
         return FloatingActionButton(
           onPressed: () {
             showModalBottomSheet(
@@ -288,7 +297,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
           tooltip: 'Agregar nuevo turno',
           child: const Icon(Icons.add),
         );
-      case 2: // StockScreen
+      case NavTab.stock:
         return FloatingActionButton(
           onPressed: () {
             showModalBottomSheet(
@@ -301,7 +310,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
           tooltip: 'Agregar nuevo producto',
           child: const Icon(Icons.add),
         );
-      case 3: // VentasScreen
+      case NavTab.ventas:
         return FloatingActionButton(
           onPressed: () {
             showModalBottomSheet(
@@ -314,7 +323,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
           tooltip: 'Registrar nueva venta',
           child: const Icon(Icons.add),
         );
-      case 5: // ProvidersScreen
+      case NavTab.providers:
         return FloatingActionButton(
           onPressed: () {
             showModalBottomSheet(
@@ -327,7 +336,7 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
           tooltip: 'Agregar nuevo proveedor',
           child: const Icon(Icons.add),
         );
-      case 6: // CuentaCorrienteScreen
+      case NavTab.fiado:
         return null; // La pantalla maneja su propio FAB
       default:
         return FloatingActionButton(
@@ -361,13 +370,13 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildNavItem(0, Icons.home, 'Inicio'),
-            _buildNavItem(1, Icons.schedule, 'Turnos'),
-            _buildNavItem(2, Icons.inventory, 'Stock'),
-            _buildNavItem(3, Icons.shopping_cart, 'Ventas'),
-            _buildNavItem(4, Icons.account_balance, 'Balance'),
-            _buildNavItem(5, Icons.people, 'Proveed.'),
-            _buildNavItem(6, Icons.account_balance_wallet, 'Fiado'),
+            _buildNavItem(NavTab.home, Icons.home, 'Inicio'),
+            _buildNavItem(NavTab.turnos, Icons.schedule, 'Turnos'),
+            _buildNavItem(NavTab.stock, Icons.inventory, 'Stock'),
+            _buildNavItem(NavTab.ventas, Icons.shopping_cart, 'Ventas'),
+            _buildNavItem(NavTab.balance, Icons.account_balance, 'Balance'),
+            _buildNavItem(NavTab.providers, Icons.people, 'Proveed.'),
+            _buildNavItem(NavTab.fiado, Icons.account_balance_wallet, 'Fiado'),
           ],
         ),
       ),

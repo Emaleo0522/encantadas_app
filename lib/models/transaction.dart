@@ -29,6 +29,11 @@ class Transaction extends HiveObject {
   @HiveField(7)
   double? unitPrice;
 
+  // Stable product reference. Older records (pre-2026-04-25) may have
+  // this null — callers must fall back to productName when so.
+  @HiveField(8)
+  String? productCode;
+
   Transaction({
     required this.amount,
     required this.date,
@@ -38,6 +43,7 @@ class Transaction extends HiveObject {
     this.productName,
     this.quantity,
     this.unitPrice,
+    this.productCode,
   });
 
   // Helper method to format date
@@ -101,6 +107,7 @@ class Transaction extends HiveObject {
       'productName': productName,
       'quantity': quantity,
       'unitPrice': unitPrice,
+      'productCode': productCode,
     };
   }
 
@@ -115,6 +122,7 @@ class Transaction extends HiveObject {
       productName: json['productName'] as String?,
       quantity: json['quantity'] as int?,
       unitPrice: json['unitPrice'] != null ? (json['unitPrice'] as num).toDouble() : null,
+      productCode: json['productCode'] as String?,
     );
   }
 }

@@ -14,7 +14,6 @@ import '../models/product.dart';
 import '../models/transaction.dart';
 import '../models/appointment.dart';
 import '../models/provider.dart';
-import '../models/supplier.dart';
 import '../models/app_settings.dart';
 import '../models/cliente.dart';
 import '../models/cuenta_corriente.dart';
@@ -348,9 +347,9 @@ class BackupService {
       final tokenData = {
         'access_token': _authClient!.credentials.accessToken.data,
         'refresh_token': _authClient!.credentials.refreshToken,
-        'expires_at': expiry?.toUtc().millisecondsSinceEpoch,
+        'expires_at': expiry.toUtc().millisecondsSinceEpoch,
       };
-      debugPrint('Saving token with expiry: ${expiry?.toUtc()}');
+      debugPrint('Saving token with expiry: ${expiry.toUtc()}');
       html.window.localStorage['encantadas_auth_token'] = jsonEncode(tokenData);
     }
   }
@@ -484,11 +483,7 @@ class BackupService {
     // Providers
     final providersBox = Hive.box<Provider>('providers');
     data['providers'] = providersBox.values.map((p) => p.toJson()).toList();
-    
-    // Suppliers
-    final suppliersBox = Hive.box<Supplier>('suppliers');
-    data['suppliers'] = suppliersBox.values.map((s) => s.toJson()).toList();
-    
+
     // Settings
     final settingsBox = Hive.box<AppSettings>('settings');
     if (settingsBox.isNotEmpty) {
@@ -614,7 +609,6 @@ class BackupService {
     await Hive.box<Transaction>('transactions').clear();
     await Hive.box<Appointment>('appointments').clear();
     await Hive.box<Provider>('providers').clear();
-    await Hive.box<Supplier>('suppliers').clear();
     await Hive.box<AppSettings>('settings').clear();
     await Hive.box<Cliente>('clientes_cuenta').clear();
     await Hive.box<CuentaCorriente>('cuentas_corrientes').clear();
@@ -656,15 +650,10 @@ class BackupService {
       }
     }
     
-    // Restore suppliers
-    if (data['suppliers'] != null) {
-      final suppliersBox = Hive.box<Supplier>('suppliers');
-      for (final supplierJson in data['suppliers']) {
-        final supplier = Supplier.fromJson(supplierJson);
-        await suppliersBox.add(supplier);
-      }
-    }
-    
+    // Suppliers: campo legacy. Backups anteriores a 2026-04-25 podian
+    // tener data['suppliers']. Se ignora silenciosamente — el feature
+    // nunca fue accesible desde la UI y se elimino.
+
     // Restore settings
     if (data['settings'] != null) {
       final settingsBox = Hive.box<AppSettings>('settings');
@@ -754,7 +743,7 @@ class BackupService {
         final blob = html.Blob([bytes], 'application/json');
         final url = html.Url.createObjectUrlFromBlob(blob);
         
-        final anchor = html.AnchorElement(href: url)
+        html.AnchorElement(href: url)
           ..target = 'blank'
           ..download = 'encantadas_backup_${DateTime.now().toIso8601String().split('T')[0]}.json'
           ..click();
@@ -794,7 +783,6 @@ class BackupService {
       debugPrint('- Transactions: ${data['transactions']?.length ?? 0}');
       debugPrint('- Appointments: ${data['appointments']?.length ?? 0}');
       debugPrint('- Providers: ${data['providers']?.length ?? 0}');
-      debugPrint('- Suppliers: ${data['suppliers']?.length ?? 0}');
       debugPrint('- Clientes cuenta: ${data['clientes_cuenta']?.length ?? 0}');
       debugPrint('- Cuentas corrientes: ${data['cuentas_corrientes']?.length ?? 0}');
       debugPrint('- Movimientos cuenta: ${data['movimientos_cuenta']?.length ?? 0}');
@@ -814,8 +802,8 @@ class BackupService {
   /// Validate backup data structure
   bool _validateBackupData(Map<String, dynamic> data) {
     final requiredFields = [
-      'products', 'transactions', 'appointments', 
-      'providers', 'suppliers', 'clientes_cuenta', 
+      'products', 'transactions', 'appointments',
+      'providers', 'clientes_cuenta',
       'cuentas_corrientes', 'movimientos_cuenta'
     ];
     
@@ -837,7 +825,6 @@ class BackupService {
         'transactions': Hive.box<Transaction>('transactions').length,
         'appointments': Hive.box<Appointment>('appointments').length,
         'providers': Hive.box<Provider>('providers').length,
-        'suppliers': Hive.box<Supplier>('suppliers').length,
         'clientes_cuenta': Hive.box<Cliente>('clientes_cuenta').length,
         'cuentas_corrientes': Hive.box<CuentaCorriente>('cuentas_corrientes').length,
         'movimientos_cuenta': Hive.box<MovimientoCuenta>('movimientos_cuenta').length,

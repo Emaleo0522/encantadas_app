@@ -210,7 +210,7 @@ class AppointmentCard extends StatelessWidget {
             ? BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.green.withOpacity(0.3),
+                  color: Colors.green.withValues(alpha: 0.3),
                   width: 2,
                 ),
               )
@@ -232,7 +232,7 @@ class AppointmentCard extends StatelessWidget {
                             ? TextDecoration.lineThrough 
                             : null,
                         color: appointment.completed
-                            ? theme.textTheme.titleMedium?.color?.withOpacity(0.6)
+                            ? theme.textTheme.titleMedium?.color?.withValues(alpha: 0.6)
                             : null,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -243,7 +243,7 @@ class AppointmentCard extends StatelessWidget {
                   PopupMenuButton<String>(
                     icon: Icon(
                       Icons.more_vert,
-                      color: theme.iconTheme.color?.withOpacity(0.7),
+                      color: theme.iconTheme.color?.withValues(alpha: 0.7),
                       size: 20,
                     ),
                     onSelected: (value) {
@@ -285,7 +285,7 @@ class AppointmentCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.green, width: 1),
                       ),
@@ -315,7 +315,7 @@ class AppointmentCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
+                            color: Colors.orange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.orange, width: 1),
                           ),
@@ -335,10 +335,10 @@ class AppointmentCard extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
+                              color: Colors.green.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.green.withOpacity(0.3),
+                                color: Colors.green.withValues(alpha: 0.3),
                               ),
                             ),
                             child: const Icon(
@@ -361,16 +361,16 @@ class AppointmentCard extends StatelessWidget {
                     Icons.access_time,
                     size: 16,
                     color: appointment.completed
-                        ? theme.iconTheme.color?.withOpacity(0.4)
-                        : theme.iconTheme.color?.withOpacity(0.7),
+                        ? theme.iconTheme.color?.withValues(alpha: 0.4)
+                        : theme.iconTheme.color?.withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     appointment.formattedDateTime,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: appointment.completed
-                          ? theme.textTheme.bodyMedium?.color?.withOpacity(0.5)
-                          : theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                          ? theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5)
+                          : theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                       decoration: appointment.completed 
                           ? TextDecoration.lineThrough 
                           : null,
@@ -387,8 +387,8 @@ class AppointmentCard extends StatelessWidget {
                     Icons.design_services,
                     size: 16,
                     color: appointment.completed
-                        ? theme.iconTheme.color?.withOpacity(0.4)
-                        : theme.iconTheme.color?.withOpacity(0.7),
+                        ? theme.iconTheme.color?.withValues(alpha: 0.4)
+                        : theme.iconTheme.color?.withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -396,8 +396,8 @@ class AppointmentCard extends StatelessWidget {
                       appointment.serviceName,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: appointment.completed
-                            ? theme.textTheme.bodyMedium?.color?.withOpacity(0.5)
-                            : theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                            ? theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5)
+                            : theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                         decoration: appointment.completed 
                             ? TextDecoration.lineThrough 
                             : null,
@@ -416,8 +416,8 @@ class AppointmentCard extends StatelessWidget {
                     Icons.attach_money,
                     size: 16,
                     color: appointment.completed
-                        ? Colors.green.withOpacity(0.7)
-                        : theme.iconTheme.color?.withOpacity(0.7),
+                        ? Colors.green.withValues(alpha: 0.7)
+                        : theme.iconTheme.color?.withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -440,7 +440,7 @@ class AppointmentCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(

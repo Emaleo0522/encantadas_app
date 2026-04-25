@@ -90,7 +90,7 @@ class _QRScannerOverlayState extends State<QRScannerOverlay> {
                         Text(
                           'En escritorio, usa búsqueda manual',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             fontSize: 14,
                           ),
                           textAlign: TextAlign.center,
@@ -248,7 +248,7 @@ class _QRScannerOverlayState extends State<QRScannerOverlay> {
                     Text(
                       'La detección es automática',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 14,
                       ),
                       textAlign: TextAlign.center,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/cliente.dart';
-import '../models/cuenta_corriente.dart';
 import '../services/cuenta_corriente_service.dart';
 import '../screens/cuenta_corriente_screen.dart';
 
@@ -28,8 +27,8 @@ class _AlertaCuentasMorosasState extends State<AlertaCuentasMorosas> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
+        color: Colors.red.withValues(alpha: 0.1),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -80,13 +79,13 @@ class _AlertaCuentasMorosasState extends State<AlertaCuentasMorosas> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withOpacity(0.2)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: Colors.red.withOpacity(0.2),
+                    backgroundColor: Colors.red.withValues(alpha: 0.2),
                     child: const Icon(Icons.person, color: Colors.red, size: 16),
                   ),
                   const SizedBox(width: 12),
@@ -145,7 +144,7 @@ class _AlertaCuentasMorosasState extends State<AlertaCuentasMorosas> {
                   label: const Text('Ver todos'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red[700],
-                    side: BorderSide(color: Colors.red.withOpacity(0.5)),
+                    side: BorderSide(color: Colors.red.withValues(alpha: 0.5)),
                   ),
                 ),
               ),

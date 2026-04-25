@@ -334,10 +334,10 @@ class _QRCodeDialogState extends State<QRCodeDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -346,7 +346,7 @@ class _QRCodeDialogState extends State<QRCodeDialog> {
                   Icon(
                     Icons.qr_code_scanner,
                     size: 64,
-                    color: Theme.of(context).colorScheme.error.withOpacity(0.7),
+                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.7),
                   ),
                   const SizedBox(height: 12),
                   Text(

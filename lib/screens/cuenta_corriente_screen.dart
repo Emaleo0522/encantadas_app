@@ -61,7 +61,7 @@ class _CuentaCorrienteScreenState extends State<CuentaCorrienteScreen> {
         gradient: LinearGradient(
           colors: [
             Theme.of(context).primaryColor,
-            Theme.of(context).primaryColor.withOpacity(0.7),
+            Theme.of(context).primaryColor.withValues(alpha: 0.7),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -203,7 +203,7 @@ class _CuentaCorrienteScreenState extends State<CuentaCorrienteScreen> {
           _filtro = valor;
         });
       },
-      selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+      selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
       checkmarkColor: Theme.of(context).primaryColor,
     );
   }
@@ -305,17 +305,17 @@ class _CuentaCorrienteScreenState extends State<CuentaCorrienteScreen> {
     final cuenta = _service.obtenerCuentaPorCliente(cliente);
     final tieneCuenta = cuenta != null;
     final saldo = cuenta?.saldoActual ?? 0.0;
-    final esMoroso = tieneCuenta && saldo > 0 && cuenta!.esMorosa;
+    final esMoroso = tieneCuenta && saldo > 0 && cuenta.esMorosa;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: esMoroso 
-              ? Colors.red.withOpacity(0.1)
+              ? Colors.red.withValues(alpha: 0.1)
               : saldo > 0 
-                  ? Colors.orange.withOpacity(0.1)
-                  : Colors.green.withOpacity(0.1),
+                  ? Colors.orange.withValues(alpha: 0.1)
+                  : Colors.green.withValues(alpha: 0.1),
           child: Icon(
             esMoroso ? Icons.warning : Icons.person,
             color: esMoroso ? Colors.red : saldo > 0 ? Colors.orange : Colors.green,
@@ -466,7 +466,7 @@ class _CuentaCorrienteScreenState extends State<CuentaCorrienteScreen> {
     
     String mensaje = '¿Eliminar a ${cliente.nombreCompleto}?\n\n';
     if (tieneSaldo) {
-      mensaje += '⚠️ ATENCIÓN: Este cliente tiene un saldo pendiente de \$${cuenta!.saldoActual.toStringAsFixed(2)}.\n\n';
+      mensaje += '⚠️ ATENCIÓN: Este cliente tiene un saldo pendiente de \$${cuenta.saldoActual.toStringAsFixed(2)}.\n\n';
       mensaje += 'Al eliminarlo se perderá toda la información de su cuenta corriente y movimientos.\n\n';
     }
     mensaje += 'Esta acción no se puede deshacer.';

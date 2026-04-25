@@ -6,50 +6,6 @@ part of 'movimiento_cuenta.dart';
 // TypeAdapterGenerator
 // **************************************************************************
 
-class TipoMovimientoAdapter extends TypeAdapter<TipoMovimiento> {
-  @override
-  final int typeId = 8;
-
-  @override
-  TipoMovimiento read(BinaryReader reader) {
-    switch (reader.readByte()) {
-      case 0:
-        return TipoMovimiento.cargo;
-      case 1:
-        return TipoMovimiento.pago;
-      case 2:
-        return TipoMovimiento.ajuste;
-      default:
-        return TipoMovimiento.cargo;
-    }
-  }
-
-  @override
-  void write(BinaryWriter writer, TipoMovimiento obj) {
-    switch (obj) {
-      case TipoMovimiento.cargo:
-        writer.writeByte(0);
-        break;
-      case TipoMovimiento.pago:
-        writer.writeByte(1);
-        break;
-      case TipoMovimiento.ajuste:
-        writer.writeByte(2);
-        break;
-    }
-  }
-
-  @override
-  int get hashCode => typeId.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is TipoMovimientoAdapter &&
-          runtimeType == other.runtimeType &&
-          typeId == other.typeId;
-}
-
 class MovimientoCuentaAdapter extends TypeAdapter<MovimientoCuenta> {
   @override
   final int typeId = 9;
@@ -104,6 +60,50 @@ class MovimientoCuentaAdapter extends TypeAdapter<MovimientoCuenta> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is MovimientoCuentaAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class TipoMovimientoAdapter extends TypeAdapter<TipoMovimiento> {
+  @override
+  final int typeId = 8;
+
+  @override
+  TipoMovimiento read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return TipoMovimiento.cargo;
+      case 1:
+        return TipoMovimiento.pago;
+      case 2:
+        return TipoMovimiento.ajuste;
+      default:
+        return TipoMovimiento.cargo;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, TipoMovimiento obj) {
+    switch (obj) {
+      case TipoMovimiento.cargo:
+        writer.writeByte(0);
+        break;
+      case TipoMovimiento.pago:
+        writer.writeByte(1);
+        break;
+      case TipoMovimiento.ajuste:
+        writer.writeByte(2);
+        break;
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TipoMovimientoAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

@@ -25,8 +25,8 @@ class PieChartCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.black.withOpacity(0.4) 
-                    : Colors.grey.withOpacity(0.15),
+                    ? Colors.black.withValues(alpha: 0.4) 
+                    : Colors.grey.withValues(alpha: 0.15),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
                 spreadRadius: 1,
@@ -41,7 +41,7 @@ class PieChartCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -135,8 +135,8 @@ class PieChartCard extends StatelessWidget {
               showChartValuesOutside: false,
               decimalPlaces: 1,
               chartValueBackgroundColor: Theme.of(context).brightness == Brightness.dark 
-                  ? Colors.grey.shade800.withOpacity(0.8)
-                  : Colors.white.withOpacity(0.8),
+                  ? Colors.grey.shade800.withValues(alpha: 0.8)
+                  : Colors.white.withValues(alpha: 0.8),
               chartValueStyle: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
@@ -306,18 +306,18 @@ class _EnhancedStatCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark 
-            ? Colors.grey.shade700.withOpacity(0.5) 
-            : color.withOpacity(0.1),
+            ? Colors.grey.shade700.withValues(alpha: 0.5) 
+            : color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
             color: isDark 
-                ? Colors.black.withOpacity(0.2) 
-                : color.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.2) 
+                : color.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -330,7 +330,7 @@ class _EnhancedStatCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -363,7 +363,7 @@ class _EnhancedStatCard extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: isDark 
                         ? Colors.grey.shade300 
-                        : color.withOpacity(0.8),
+                        : color.withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 6),

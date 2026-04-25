@@ -27,13 +27,14 @@ class ProductAdapter extends TypeAdapter<Product> {
       salePrice: fields[7] as double?,
       profitPercentage: fields[8] as double?,
       usePercentage: fields[9] as bool,
+      tags: (fields[10] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Product obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -53,7 +54,9 @@ class ProductAdapter extends TypeAdapter<Product> {
       ..writeByte(8)
       ..write(obj.profitPercentage)
       ..writeByte(9)
-      ..write(obj.usePercentage);
+      ..write(obj.usePercentage)
+      ..writeByte(10)
+      ..write(obj.tags);
   }
 
   @override

@@ -1,13 +1,188 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/provider.dart';
+import '../utils/text_search.dart';
 import '../widgets/qr_code_dialog.dart';
 import '../widgets/edit_product_form.dart';
 import 'providers_screen.dart';
 
-class StockScreen extends StatelessWidget {
+enum StockFilter { all, inStock, lowStock, outOfStock }
+
+class StockScreen extends StatefulWidget {
   const StockScreen({super.key});
+
+  @override
+  State<StockScreen> createState() => _StockScreenState();
+}
+
+class _StockScreenState extends State<StockScreen> {
+  final _searchController = TextEditingController();
+  Timer? _debounce;
+  String _searchQuery = '';
+  ProductCategory? _selectedCategory;
+  StockFilter _stockFilter = StockFilter.all;
+  final Set<String> _selectedTags = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = _searchController.text);
+    });
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _selectedCategory = null;
+      _stockFilter = StockFilter.all;
+      _selectedTags.clear();
+    });
+  }
+
+  bool get _hasActiveFilters =>
+      _searchQuery.isNotEmpty ||
+      _selectedCategory != null ||
+      _stockFilter != StockFilter.all ||
+      _selectedTags.isNotEmpty;
+
+  List<Product> _applyFilters(List<Product> products) {
+    return products.where((p) {
+      if (_searchQuery.isNotEmpty &&
+          !matchesQuery(_searchQuery, [p.name, p.code])) {
+        return false;
+      }
+      if (_selectedCategory != null && p.category != _selectedCategory) {
+        return false;
+      }
+      switch (_stockFilter) {
+        case StockFilter.all:
+          break;
+        case StockFilter.inStock:
+          if (p.quantity <= 5) return false;
+          break;
+        case StockFilter.lowStock:
+          if (p.quantity == 0 || p.quantity > 5) return false;
+          break;
+        case StockFilter.outOfStock:
+          if (p.quantity != 0) return false;
+          break;
+      }
+      if (_selectedTags.isNotEmpty) {
+        final productTags = p.tagsNormalized.toSet();
+        if (!_selectedTags.every(productTags.contains)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Future<void> _showTagsPicker(List<String> allTags) async {
+    final selected = Set<String>.from(_selectedTags);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setSheetState) {
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.local_offer, color: Colors.purple),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Filtrar por tags',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    if (selected.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setSheetState(() => selected.clear()),
+                        child: const Text('Limpiar'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Producto debe tener TODOS los tags seleccionados.',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                if (allTags.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'Aún no hay tags creados. Agregá tags al cargar/editar productos.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: allTags.map((tag) {
+                          final isOn = selected.contains(tag);
+                          return FilterChip(
+                            label: Text(tag),
+                            selected: isOn,
+                            onSelected: (v) => setSheetState(() {
+                              v ? selected.add(tag) : selected.remove(tag);
+                            }),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedTags
+                          ..clear()
+                          ..addAll(selected);
+                      });
+                      Navigator.of(ctx).pop();
+                    },
+                    child: Text('Aplicar (${selected.length})'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,60 +206,232 @@ class StockScreen extends StatelessWidget {
       body: ValueListenableBuilder<Box<Product>>(
         valueListenable: Hive.box<Product>('products').listenable(),
         builder: (context, box, _) {
-          final products = box.values.toList().cast<Product>();
-          
-          // Sort products by category and then by name
-          products.sort((a, b) {
-            final categoryComparison = a.category.index.compareTo(b.category.index);
-            if (categoryComparison != 0) return categoryComparison;
+          final allProducts = box.values.toList().cast<Product>();
+          final allTags = <String>{};
+          for (final p in allProducts) {
+            allTags.addAll(p.tagsNormalized);
+          }
+          final sortedTags = allTags.toList()..sort();
+
+          allProducts.sort((a, b) {
+            final catCmp = a.category.index.compareTo(b.category.index);
+            if (catCmp != 0) return catCmp;
             return a.name.toLowerCase().compareTo(b.name.toLowerCase());
           });
 
-          if (products.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          final filtered = _applyFilters(allProducts);
+          final isEmpty = allProducts.isEmpty;
+          final noResults = !isEmpty && filtered.isEmpty;
+
+          return Column(
+            children: [
+              _buildFilterBar(allProducts.length, filtered.length, sortedTags),
+              Expanded(
+                child: isEmpty
+                    ? _emptyState()
+                    : noResults
+                        ? _noResultsState()
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              final product = filtered[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ProductCard(product: product),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFilterBar(int total, int matching, List<String> allTags) {
+    final theme = Theme.of(context);
+    return Material(
+      elevation: 1,
+      child: Container(
+        color: theme.scaffoldBackgroundColor,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar por nombre o código...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.inventory,
-                    size: 80,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Sin productos por el momento',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Presiona el botón + para agregar tu primer producto',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                    textAlign: TextAlign.center,
+                  _categoryChip(label: 'Todas', value: null),
+                  ...ProductCategory.values.map(
+                    (c) => _categoryChip(label: c.displayName, value: c),
                   ),
                 ],
               ),
-            );
-          }
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _stockMenuButton(),
+                const SizedBox(width: 8),
+                _tagsButton(allTags),
+                const Spacer(),
+                Text(
+                  matching == total
+                      ? '$total productos'
+                      : '$matching de $total',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (_hasActiveFilters)
+                  IconButton(
+                    icon: const Icon(Icons.filter_alt_off, size: 20),
+                    onPressed: _clearAllFilters,
+                    tooltip: 'Limpiar filtros',
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              final product = products[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: ProductCard(product: product),
-              );
-            },
-          );
-        },
+  Widget _categoryChip({required String label, required ProductCategory? value}) {
+    final isSelected = _selectedCategory == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (_) => setState(() => _selectedCategory = isSelected ? null : value),
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+
+  Widget _stockMenuButton() {
+    return PopupMenuButton<StockFilter>(
+      tooltip: 'Filtrar por estado de stock',
+      onSelected: (v) => setState(() => _stockFilter = v),
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: StockFilter.all, child: Text('Todos')),
+        PopupMenuItem(value: StockFilter.inStock, child: Text('En stock')),
+        PopupMenuItem(value: StockFilter.lowStock, child: Text('Stock bajo (≤5)')),
+        PopupMenuItem(value: StockFilter.outOfStock, child: Text('Sin stock')),
+      ],
+      child: Chip(
+        avatar: const Icon(Icons.inventory_2_outlined, size: 16),
+        label: Text(_stockFilterLabel(_stockFilter)),
+        backgroundColor: _stockFilter == StockFilter.all
+            ? null
+            : Colors.blue.withValues(alpha: 0.12),
+        side: _stockFilter == StockFilter.all
+            ? null
+            : BorderSide(color: Colors.blue.withValues(alpha: 0.4)),
+      ),
+    );
+  }
+
+  String _stockFilterLabel(StockFilter f) {
+    switch (f) {
+      case StockFilter.all:
+        return 'Stock: todos';
+      case StockFilter.inStock:
+        return 'En stock';
+      case StockFilter.lowStock:
+        return 'Stock bajo';
+      case StockFilter.outOfStock:
+        return 'Sin stock';
+    }
+  }
+
+  Widget _tagsButton(List<String> allTags) {
+    final count = _selectedTags.length;
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => _showTagsPicker(allTags),
+      child: Chip(
+        avatar: const Icon(Icons.local_offer_outlined, size: 16),
+        label: Text(count == 0 ? 'Tags' : 'Tags ($count)'),
+        backgroundColor: count == 0
+            ? null
+            : Colors.purple.withValues(alpha: 0.12),
+        side: count == 0
+            ? null
+            : BorderSide(color: Colors.purple.withValues(alpha: 0.4)),
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory, size: 80, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            'Sin productos por el momento',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Presiona el botón + para agregar tu primer producto',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _noResultsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 12),
+            const Text(
+              'Sin resultados con estos filtros',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: _clearAllFilters,
+              icon: const Icon(Icons.filter_alt_off),
+              label: const Text('Limpiar filtros'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -126,9 +473,7 @@ class ProductCard extends StatelessWidget {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Eliminar'),
             ),
           ],
@@ -141,18 +486,16 @@ class ProductCard extends StatelessWidget {
         await product.delete();
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.delete, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('Producto eliminado del stock'),
-                  ),
+                  Icon(Icons.delete, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Producto eliminado del stock')),
                 ],
               ),
               backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 2),
+              duration: Duration(seconds: 2),
             ),
           );
         }
@@ -171,22 +514,17 @@ class ProductCard extends StatelessWidget {
   }
 
   Future<void> _editProduct(BuildContext context) async {
-    final result = await showDialog<bool>(
+    await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return EditProductForm(product: product);
       },
     );
-
-    if (result == true && context.mounted) {
-      // Product was successfully updated, no need for additional actions
-      // The UI will automatically update due to ValueListenableBuilder
-    }
   }
 
   Future<void> _editQuantity(BuildContext context) async {
     final controller = TextEditingController(text: product.quantity.toString());
-    
+
     final newQuantity = await showDialog<int>(
       context: context,
       builder: (BuildContext context) {
@@ -253,7 +591,7 @@ class ProductCard extends StatelessWidget {
     if (newQuantity != null && context.mounted) {
       await _updateQuantity(context, newQuantity);
     }
-    
+
     controller.dispose();
   }
 
@@ -265,12 +603,12 @@ class ProductCard extends StatelessWidget {
 
       if (context.mounted) {
         final difference = newQuantity - oldQuantity;
-        final message = difference > 0 
+        final message = difference > 0
             ? 'Stock aumentado en ${difference.abs()} unidades'
-            : difference < 0 
+            : difference < 0
                 ? 'Stock reducido en ${difference.abs()} unidades'
                 : 'Cantidad actualizada';
-                
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -312,7 +650,7 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -320,24 +658,20 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product name and status row with menu
             Row(
               children: [
                 Expanded(
                   child: Text(
                     product.name,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Three-dot menu
                 PopupMenuButton<String>(
                   icon: Icon(
                     Icons.more_vert,
-                    color: theme.iconTheme.color?.withOpacity(0.7),
+                    color: theme.iconTheme.color?.withValues(alpha: 0.7),
                     size: 20,
                   ),
                   onSelected: (value) {
@@ -354,59 +688,45 @@ class ProductCard extends StatelessWidget {
                   itemBuilder: (BuildContext context) => [
                     const PopupMenuItem<String>(
                       value: 'qr',
-                      child: Row(
-                        children: [
-                          Icon(Icons.qr_code, color: Colors.purple, size: 18),
-                          SizedBox(width: 8),
-                          Text('Ver código QR'),
-                        ],
-                      ),
+                      child: Row(children: [
+                        Icon(Icons.qr_code, color: Colors.purple, size: 18),
+                        SizedBox(width: 8),
+                        Text('Ver código QR'),
+                      ]),
                     ),
                     const PopupMenuItem<String>(
                       value: 'edit_full',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_note, color: Colors.green, size: 18),
-                          SizedBox(width: 8),
-                          Text('Editar producto'),
-                        ],
-                      ),
+                      child: Row(children: [
+                        Icon(Icons.edit_note, color: Colors.green, size: 18),
+                        SizedBox(width: 8),
+                        Text('Editar producto'),
+                      ]),
                     ),
                     const PopupMenuItem<String>(
                       value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, color: Colors.blue, size: 18),
-                          SizedBox(width: 8),
-                          Text('Editar cantidad'),
-                        ],
-                      ),
+                      child: Row(children: [
+                        Icon(Icons.edit, color: Colors.blue, size: 18),
+                        SizedBox(width: 8),
+                        Text('Editar cantidad'),
+                      ]),
                     ),
                     const PopupMenuItem<String>(
                       value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, color: Colors.red, size: 18),
-                          SizedBox(width: 8),
-                          Text('Eliminar'),
-                        ],
-                      ),
+                      child: Row(children: [
+                        Icon(Icons.delete, color: Colors.red, size: 18),
+                        SizedBox(width: 8),
+                        Text('Eliminar'),
+                      ]),
                     ),
                   ],
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: product.quantityStatusColor.withOpacity(0.1),
+                    color: product.quantityStatusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: product.quantityStatusColor,
-                      width: 1,
-                    ),
+                    border: Border.all(color: product.quantityStatusColor, width: 1),
                   ),
                   child: Text(
                     product.quantityStatus,
@@ -420,15 +740,10 @@ class ProductCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            
-            // Category
+
             Row(
               children: [
-                Icon(
-                  Icons.category,
-                  size: 16,
-                  color: product.categoryColor,
-                ),
+                Icon(Icons.category, size: 16, color: product.categoryColor),
                 const SizedBox(width: 8),
                 Text(
                   product.categoryDisplayName,
@@ -440,20 +755,41 @@ class ProductCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            
-            // Product code
+
+            if (product.tagsNormalized.isNotEmpty) ...[
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: product.tagsNormalized.map((t) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      t,
+                      style: const TextStyle(color: Colors.purple, fontSize: 11),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 8),
+            ],
+
             Row(
               children: [
                 Icon(
                   Icons.qr_code,
                   size: 16,
-                  color: theme.iconTheme.color?.withOpacity(0.7),
+                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Código: ${product.formattedCode}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.iconTheme.color?.withOpacity(0.7),
+                    color: theme.iconTheme.color?.withValues(alpha: 0.7),
                     fontWeight: FontWeight.w500,
                     fontFamily: 'monospace',
                   ),
@@ -462,26 +798,16 @@ class ProductCard extends StatelessWidget {
                 GestureDetector(
                   onTap: () => _showQRCode(context),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
+                      color: Colors.purple.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.purple.withOpacity(0.3),
-                        width: 1,
-                      ),
+                      border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.qr_code,
-                          color: Colors.purple,
-                          size: 14,
-                        ),
+                        Icon(Icons.qr_code, color: Colors.purple, size: 14),
                         SizedBox(width: 4),
                         Text(
                           'Ver QR',
@@ -498,14 +824,13 @@ class ProductCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            
-            // Quantity with +/- controls
+
             Row(
               children: [
                 Icon(
                   Icons.numbers,
                   size: 16,
-                  color: theme.iconTheme.color?.withOpacity(0.7),
+                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -516,12 +841,11 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                // Quick adjustment controls
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     InkWell(
-                      onTap: product.quantity > 0 
+                      onTap: product.quantity > 0
                           ? () => _quickAdjustQuantity(context, -1)
                           : null,
                       borderRadius: BorderRadius.circular(16),
@@ -530,21 +854,19 @@ class ProductCard extends StatelessWidget {
                         height: 32,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: product.quantity > 0 
-                              ? Colors.red.withOpacity(0.1)
-                              : Colors.grey.withOpacity(0.1),
+                          color: product.quantity > 0
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : Colors.grey.withValues(alpha: 0.1),
                           border: Border.all(
-                            color: product.quantity > 0 
-                                ? Colors.red.withOpacity(0.3)
-                                : Colors.grey.withOpacity(0.3),
+                            color: product.quantity > 0
+                                ? Colors.red.withValues(alpha: 0.3)
+                                : Colors.grey.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Icon(
                           Icons.remove,
                           size: 16,
-                          color: product.quantity > 0 
-                              ? Colors.red
-                              : Colors.grey,
+                          color: product.quantity > 0 ? Colors.red : Colors.grey,
                         ),
                       ),
                     ),
@@ -557,16 +879,10 @@ class ProductCard extends StatelessWidget {
                         height: 32,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.green.withOpacity(0.1),
-                          border: Border.all(
-                            color: Colors.green.withOpacity(0.3),
-                          ),
+                          color: Colors.green.withValues(alpha: 0.1),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                         ),
-                        child: const Icon(
-                          Icons.add,
-                          size: 16,
-                          color: Colors.green,
-                        ),
+                        child: const Icon(Icons.add, size: 16, color: Colors.green),
                       ),
                     ),
                   ],
@@ -574,17 +890,12 @@ class ProductCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            
-            // Cost and pricing info
+
             if (product.hasCostInfo || product.hasSalePriceInfo || product.hasProvider) ...[
               if (product.hasCostInfo)
                 Row(
                   children: [
-                    Icon(
-                      Icons.shopping_cart,
-                      size: 16,
-                      color: Colors.red,
-                    ),
+                    const Icon(Icons.shopping_cart, size: 16, color: Colors.red),
                     const SizedBox(width: 8),
                     Text(
                       'Costo: ${product.formattedCost}',
@@ -600,11 +911,7 @@ class ProductCard extends StatelessWidget {
               if (product.hasSalePriceInfo)
                 Row(
                   children: [
-                    Icon(
-                      Icons.sell,
-                      size: 16,
-                      color: Colors.green,
-                    ),
+                    const Icon(Icons.sell, size: 16, color: Colors.green),
                     const SizedBox(width: 8),
                     Text(
                       'Venta: ${product.formattedCalculatedSalePrice}',
@@ -618,9 +925,9 @@ class ProductCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
+                          color: Colors.blue.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           '${product.profitPercentage!.toStringAsFixed(0)}%',
@@ -634,16 +941,11 @@ class ProductCard extends StatelessWidget {
                     ],
                   ],
                 ),
-              if (product.hasSalePriceInfo && product.hasCostInfo)
-                ...[
+              if (product.hasSalePriceInfo && product.hasCostInfo) ...[
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Icon(
-                      Icons.trending_up,
-                      size: 16,
-                      color: Colors.purple,
-                    ),
+                    const Icon(Icons.trending_up, size: 16, color: Colors.purple),
                     const SizedBox(width: 8),
                     Text(
                       'Ganancia: ${product.formattedProfit}',
@@ -663,7 +965,6 @@ class ProductCard extends StatelessWidget {
                   builder: (context, box, _) {
                     Provider? provider;
                     if (product.providerId != null) {
-                      // Buscar el proveedor por su key
                       for (var p in box.values) {
                         if (p.key.toString() == product.providerId) {
                           provider = p;
@@ -671,24 +972,22 @@ class ProductCard extends StatelessWidget {
                         }
                       }
                     }
-                    
-                    if (provider == null) {
-                      return const SizedBox.shrink();
-                    }
-                    
+
+                    if (provider == null) return const SizedBox.shrink();
+
                     return Row(
                       children: [
                         Icon(
                           Icons.business,
                           size: 16,
-                          color: theme.iconTheme.color?.withOpacity(0.7),
+                          color: theme.iconTheme.color?.withValues(alpha: 0.7),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Proveedor: ${provider.name}',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -699,20 +998,19 @@ class ProductCard extends StatelessWidget {
                 ),
               const SizedBox(height: 8),
             ],
-            
-            // Created date
+
             Row(
               children: [
                 Icon(
                   Icons.calendar_today,
                   size: 16,
-                  color: theme.iconTheme.color?.withOpacity(0.7),
+                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Agregado: ${product.formattedCreatedAt}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.8),
+                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
                   ),
                 ),
               ],

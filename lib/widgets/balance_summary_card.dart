@@ -26,8 +26,8 @@ class BalanceSummaryCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.black.withOpacity(0.4) 
-                    : Colors.grey.withOpacity(0.15),
+                    ? Colors.black.withValues(alpha: 0.4) 
+                    : Colors.grey.withValues(alpha: 0.15),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
                 spreadRadius: 1,
@@ -42,7 +42,7 @@ class BalanceSummaryCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -268,15 +268,15 @@ class _EnhancedSummaryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark 
-              ? color.withOpacity(0.3) 
-              : Colors.white.withOpacity(0.2),
+              ? color.withValues(alpha: 0.3) 
+              : Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
             color: isDark 
-                ? Colors.black.withOpacity(0.4) 
-                : color.withOpacity(0.2),
+                ? Colors.black.withValues(alpha: 0.4) 
+                : color.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
             spreadRadius: 1,
@@ -291,13 +291,13 @@ class _EnhancedSummaryCard extends StatelessWidget {
             height: 60,
             decoration: BoxDecoration(
               color: isDark 
-                  ? Colors.white.withOpacity(0.1) 
-                  : Colors.white.withOpacity(0.2),
+                  ? Colors.white.withValues(alpha: 0.1) 
+                  : Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isDark 
-                    ? Colors.white.withOpacity(0.2) 
-                    : Colors.white.withOpacity(0.3),
+                    ? Colors.white.withValues(alpha: 0.2) 
+                    : Colors.white.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -334,7 +334,7 @@ class _EnhancedSummaryCard extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: isDark 
                         ? Colors.grey.shade300 
-                        : Colors.white.withOpacity(0.9),
+                        : Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -371,8 +371,8 @@ class _EnhancedSummaryCard extends StatelessWidget {
             height: 60,
             decoration: BoxDecoration(
               color: isDark 
-                  ? Colors.white.withOpacity(0.7) 
-                  : Colors.white.withOpacity(0.8),
+                  ? Colors.white.withValues(alpha: 0.7) 
+                  : Colors.white.withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(2),
             ),
           ),

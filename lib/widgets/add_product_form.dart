@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/product.dart';
 import '../models/provider.dart';
 import '../utils/product_code_generator.dart';
+import 'tags_input.dart';
 
 class AddProductForm extends StatefulWidget {
   const AddProductForm({super.key});
@@ -25,6 +26,7 @@ class _AddProductFormState extends State<AddProductForm> {
   bool _isLoading = false;
   String _previewCode = '';
   bool _usePercentage = false;
+  List<String> _tags = [];
 
   @override
   void initState() {
@@ -160,6 +162,7 @@ class _AddProductFormState extends State<AddProductForm> {
                 : double.parse(_profitPercentageController.text.trim()))
             : null,
         usePercentage: _usePercentage,
+        tags: _tags.isEmpty ? null : List<String>.from(_tags),
       );
 
       await box.add(product);
@@ -353,10 +356,10 @@ class _AddProductFormState extends State<AddProductForm> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Colors.green.withOpacity(0.3),
+                  color: Colors.green.withValues(alpha: 0.3),
                 ),
               ),
               child: Column(
@@ -508,10 +511,10 @@ class _AddProductFormState extends State<AddProductForm> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.blue.withOpacity(0.3),
+                          color: Colors.blue.withValues(alpha: 0.3),
                         ),
                       ),
                       child: _buildPricePreview(),
@@ -560,16 +563,32 @@ class _AddProductFormState extends State<AddProductForm> {
                 );
               },
             ),
+            const SizedBox(height: 16),
+
+            // Tags personalizados (filtros en Stock/Ventas)
+            ValueListenableBuilder<Box<Product>>(
+              valueListenable: Hive.box<Product>('products').listenable(),
+              builder: (context, box, _) {
+                final allTags = collectAllTags(box.values);
+                return TagsInput(
+                  initialTags: _tags,
+                  onChanged: (newTags) => _tags = newTags,
+                  suggestions: allTags,
+                  label: 'Tags (opcional)',
+                  hint: 'Ej: verano, oferta, regalo...',
+                );
+              },
+            ),
             const SizedBox(height: 24),
 
             // Category preview
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _getCategoryColor(_selectedCategory).withOpacity(0.1),
+                color: _getCategoryColor(_selectedCategory).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _getCategoryColor(_selectedCategory).withOpacity(0.3),
+                  color: _getCategoryColor(_selectedCategory).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -596,10 +615,10 @@ class _AddProductFormState extends State<AddProductForm> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.purple.withOpacity(0.1),
+                color: Colors.purple.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Colors.purple.withOpacity(0.3),
+                  color: Colors.purple.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(

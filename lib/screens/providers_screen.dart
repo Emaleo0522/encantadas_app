@@ -322,7 +322,7 @@ class ProviderCard extends StatelessWidget {
                 PopupMenuButton<String>(
                   icon: Icon(
                     Icons.more_vert,
-                    color: theme.iconTheme.color?.withOpacity(0.7),
+                    color: theme.iconTheme.color?.withValues(alpha: 0.7),
                     size: 20,
                   ),
                   onSelected: (value) {
@@ -353,14 +353,14 @@ class ProviderCard extends StatelessWidget {
                 Icon(
                   Icons.category,
                   size: 16,
-                  color: theme.iconTheme.color?.withOpacity(0.7),
+                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     provider.rubroWithEmoji,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                       fontWeight: FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -377,14 +377,14 @@ class ProviderCard extends StatelessWidget {
                   Icon(
                     Icons.contact_phone,
                     size: 16,
-                    color: theme.iconTheme.color?.withOpacity(0.7),
+                    color: theme.iconTheme.color?.withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       provider.formattedContact,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -403,10 +403,10 @@ class ProviderCard extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF25D366).withOpacity(0.1),
+                          color: const Color(0xFF25D366).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: const Color(0xFF25D366).withOpacity(0.3),
+                            color: const Color(0xFF25D366).withValues(alpha: 0.3),
                           ),
                         ),
                         child: const Icon(

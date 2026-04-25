@@ -46,6 +46,12 @@ class Product extends HiveObject {
   @HiveField(9)
   bool usePercentage;
 
+  // Tags personalizados del usuario (chips para filtrar en Stock/Ventas).
+  // Adicional a `category`. Cada tag se almacena en lowercase y trimmed.
+  // Backward-compat: productos viejos quedan con null.
+  @HiveField(10)
+  List<String>? tags;
+
   Product({
     required this.name,
     required this.category,
@@ -57,7 +63,17 @@ class Product extends HiveObject {
     this.salePrice,
     this.profitPercentage,
     this.usePercentage = false,
+    this.tags,
   });
+
+  /// Tags normalizados y sin nulls. Lista vacía si no hay tags.
+  List<String> get tagsNormalized {
+    if (tags == null) return const [];
+    return tags!
+        .map((t) => t.trim().toLowerCase())
+        .where((t) => t.isNotEmpty)
+        .toList();
+  }
 
   // Helper method to get category display name with emoji
   String get categoryDisplayName {
@@ -300,6 +316,7 @@ class Product extends HiveObject {
       'salePrice': salePrice,
       'profitPercentage': profitPercentage,
       'usePercentage': usePercentage,
+      'tags': tags,
     };
   }
 
@@ -319,6 +336,7 @@ class Product extends HiveObject {
       salePrice: json['salePrice'] as double?,
       profitPercentage: json['profitPercentage'] as double?,
       usePercentage: json['usePercentage'] as bool? ?? false,
+      tags: (json['tags'] as List?)?.map((e) => e as String).toList(),
     );
   }
 }
