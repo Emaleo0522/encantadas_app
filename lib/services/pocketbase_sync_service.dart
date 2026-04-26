@@ -124,6 +124,30 @@ class PocketBaseSyncService {
 
     if (_isAuthenticated && _enabled) {
       _startPeriodicSync();
+      // Cargar el hash del ultimo backup para evitar duplicar uno
+      // identico en el primer sync de la sesion (al reabrir la app
+      // sin haber cambiado nada).
+      unawaited(_loadLastSyncedHash());
+    }
+  }
+
+  /// Lee el `data_hash` del ultimo backup del server para inicializar
+  /// `_lastSyncedHash`. Esto evita crear backups duplicados cuando la
+  /// app se abre y el data local no cambio respecto a la ultima sesion.
+  Future<void> _loadLastSyncedHash() async {
+    try {
+      final result = await _pb.collection(_backupCollection).getList(
+            page: 1,
+            perPage: 1,
+            sort: '-created',
+            fields: 'data_hash',
+          );
+      if (result.items.isNotEmpty) {
+        _lastSyncedHash = result.items.first.getStringValue('data_hash');
+        debugPrint('PB Sync: loaded last hash from server (skip dup)');
+      }
+    } catch (e) {
+      debugPrint('PB Sync: loadLastHash failed: $e');
     }
   }
 
@@ -143,7 +167,9 @@ class PocketBaseSyncService {
 
         if (_enabled) {
           _startPeriodicSync();
-          // Sync inmediato tras primer login
+          // Cargar hash del ultimo backup antes de hacer el primer sync
+          // (evita duplicar si el data ya esta sincronizado desde otra sesion).
+          await _loadLastSyncedHash();
           unawaited(_performSync());
         }
         return true;
@@ -364,7 +390,10 @@ class PocketBaseSyncService {
 
     try {
       final backupData = await _collectAllData();
-      final jsonString = jsonEncode(backupData);
+      // Hash sobre los datos REALES (excluyendo metadata, que tiene timestamp).
+      // Sino el hash siempre cambia y nunca aplica el dedup.
+      final hashableData = Map<String, dynamic>.from(backupData)..remove('metadata');
+      final jsonString = jsonEncode(hashableData);
       final dataHash = sha256.convert(utf8.encode(jsonString)).toString();
 
       // Skip si el hash no cambio (nada nuevo que sincronizar)

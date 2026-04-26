@@ -37,8 +37,8 @@ Future<_ResizedImage?> _resizeImageToBlob(
     img.src = url;
     await img.onLoad.first;
 
-    final w = img.naturalWidth ?? img.width ?? 0;
-    final h = img.naturalHeight ?? img.height ?? 0;
+    final w = img.naturalWidth;
+    final h = img.naturalHeight;
     if (w == 0 || h == 0) return null;
 
     int targetW, targetH;
