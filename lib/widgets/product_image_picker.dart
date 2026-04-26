@@ -1,7 +1,78 @@
+import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../services/pocketbase_sync_service.dart';
+
+/// Resultado de redimensionar una imagen.
+class _ResizedImage {
+  final List<int> bytes;
+  final int width;
+  final int height;
+  _ResizedImage(this.bytes, this.width, this.height);
+}
+
+/// Cambia la extensión del filename a .jpg (porque siempre se exporta
+/// como JPEG después del resize).
+String _withJpgExtension(String filename) {
+  final dot = filename.lastIndexOf('.');
+  if (dot < 0) return '$filename.jpg';
+  return '${filename.substring(0, dot)}.jpg';
+}
+
+/// Redimensiona una imagen del DOM usando canvas. Devuelve los bytes JPEG
+/// del resultado. Si falla (ej: gif animado, formato no soportado), null.
+///
+/// `maxSide`: la dimensión más larga después del resize (mantiene aspect ratio).
+/// `quality`: calidad JPEG 0-1 (default 0.85).
+Future<_ResizedImage?> _resizeImageToBlob(
+  html.File file, {
+  int maxSide = 800,
+  num quality = 0.85,
+}) async {
+  // Cargar el archivo en una <img>
+  final url = html.Url.createObjectUrlFromBlob(file);
+  try {
+    final img = html.ImageElement();
+    img.src = url;
+    await img.onLoad.first;
+
+    final w = img.naturalWidth ?? img.width ?? 0;
+    final h = img.naturalHeight ?? img.height ?? 0;
+    if (w == 0 || h == 0) return null;
+
+    int targetW, targetH;
+    if (w <= maxSide && h <= maxSide) {
+      // Ya es chica, no redimensionar (pero re-encode a JPEG para uniformidad)
+      targetW = w;
+      targetH = h;
+    } else if (w >= h) {
+      targetW = maxSide;
+      targetH = (h * maxSide / w).round();
+    } else {
+      targetH = maxSide;
+      targetW = (w * maxSide / h).round();
+    }
+
+    final canvas = html.CanvasElement(width: targetW, height: targetH);
+    final ctx = canvas.context2D;
+    // Fondo blanco para imágenes con transparencia (PNG → JPEG)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetW, targetH);
+    ctx.drawImageScaled(img, 0, 0, targetW, targetH);
+
+    final blob = await canvas.toBlob('image/jpeg', quality);
+    final reader = html.FileReader();
+    reader.readAsArrayBuffer(blob);
+    await reader.onLoad.first;
+    final bytes = (reader.result as Uint8List).toList();
+    return _ResizedImage(bytes, targetW, targetH);
+  } catch (_) {
+    return null;
+  } finally {
+    html.Url.revokeObjectUrl(url);
+  }
+}
 
 /// Picker de imagen para producto. Solo Web (usa input file del DOM).
 ///
@@ -83,11 +154,13 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
     if (files == null || files.isEmpty) return;
     final file = files.first;
 
-    if (file.size > 5 * 1024 * 1024) {
+    // 20 MB hard limit antes del resize (después del resize JPEG q0.85
+    // típicamente queda en 100-300 KB)
+    if (file.size > 20 * 1024 * 1024) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Imagen demasiado grande (máx 5 MB).'),
+            content: Text('Imagen demasiado grande (máx 20 MB antes del redimensionado).'),
             backgroundColor: Colors.red,
           ),
         );
@@ -95,19 +168,41 @@ class _ProductImagePickerState extends State<ProductImagePicker> {
       return;
     }
 
-    final reader = html.FileReader();
-    reader.readAsArrayBuffer(file);
-    await reader.onLoad.first;
-    final bytes = (reader.result as Uint8List).toList();
-
     setState(() => _loading = true);
+
+    // Pre-redimensionar en cliente: max 800px lado mayor, JPEG calidad 0.85.
+    // Esto reduce 2-5MB típicos a 100-300KB sin pérdida visible para fotos
+    // de producto. Si falla el resize (ej: gif animado), cae al original.
+    List<int> bytes;
+    String filename;
+    try {
+      final resized = await _resizeImageToBlob(file, maxSide: 800, quality: 0.85);
+      if (resized != null) {
+        bytes = resized.bytes;
+        filename = _withJpgExtension(file.name);
+      } else {
+        // Fallback: leer original
+        final reader = html.FileReader();
+        reader.readAsArrayBuffer(file);
+        await reader.onLoad.first;
+        bytes = (reader.result as Uint8List).toList();
+        filename = file.name;
+      }
+    } catch (e) {
+      // Cualquier error de resize: usar original
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoad.first;
+      bytes = (reader.result as Uint8List).toList();
+      filename = file.name;
+    }
 
     // Upload nueva
     final newId = await sync.uploadFile(
       kind: 'product_image',
       refId: widget.productCode,
       bytes: bytes,
-      filename: file.name,
+      filename: filename,
     );
 
     if (newId == null) {
